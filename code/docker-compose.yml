@@ -1,0 +1,24 @@
+version: '3.8'
+
+services:
+  pylucene:
+    build:
+      context: ./pylucene
+      dockerfile: Dockerfile
+    container_name: clef-pylucene
+    volumes:
+      - ./pylucene/src:/app/src
+      - ./experiment:/app/experiment
+    stdin_open: true
+    tty: true
+
+  pyserini:
+    build:
+      context: ./pyserini
+      dockerfile: Dockerfile
+    container_name: clef-pyserini
+    volumes:
+      - ./pyserini/src:/app/src
+      - ./experiment:/app/experiment
+    stdin_open: true
+    tty: true

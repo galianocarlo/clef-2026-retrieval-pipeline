@@ -71,3 +71,15 @@ tomcat-logs/
 
 # OSX
 .DS_Store
+
+# Docker experiment outputs - index and docs are auto-generated, ignore them
+code/experiment/index/
+code/experiment/docs/
+
+# Keep runs folder tracked but ignore its contents except .gitkeep
+code/experiment/runs/*
+!code/experiment/runs/.gitkeep
+
+# VSCode
+.vs/
+.vscode/
