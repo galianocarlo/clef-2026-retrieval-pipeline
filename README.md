@@ -14,14 +14,9 @@ The homeworks are carried out by groups of students and consists in participatin
 ### Team Members ###
 
 - Stefano Riato (stefano.riato@studenti.unipd.it)
-<<<<<<< HEAD
-- 
 - Alberto Iurlo (alberto.iurlo@studenti.unipd.it)
-=======
 - Carlo Galiano (carlo.galiano.1@studenti.unipd.it)
-- 
->>>>>>> 613bd8be8356e36c9df5c8b0236fb3a111d76b91
-- 
+
 
 ### Organisation of the repository ###
 
