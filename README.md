@@ -11,6 +11,13 @@ The homeworks are carried out by groups of students and consists in participatin
 
 *Search Engines* is part of the teaching activities of the [Intelligent Interactive Information Access (IIIA) Hub](http://iiia.dei.unipd.it/).
 
+### Team Members ###
+
+- Stefano Riato (stefano.riato@studenti.unipd.it)
+- 
+- 
+- 
+
 ### Organisation of the repository ###
 
 The repository is organised as follows:
