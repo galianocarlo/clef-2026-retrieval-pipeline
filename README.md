@@ -14,7 +14,7 @@ The homeworks are carried out by groups of students and consists in participatin
 ### Team Members ###
 
 - Stefano Riato (stefano.riato@studenti.unipd.it)
-- 
+- Carlo Galiano (carlo.galiano.1@studenti.unipd.it)
 - 
 - 
 
