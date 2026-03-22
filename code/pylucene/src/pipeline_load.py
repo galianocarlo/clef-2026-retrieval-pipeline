@@ -73,12 +73,12 @@ def validate(output_dir: str) -> None:
     print("\n  [VALIDATE] Reloading and checking output files...")
 
     expected_files = {
-        "en_train.csv": ["index", "text", "pubkey", "language", "split"],
-        "en_dev.csv":   ["index", "text", "pubkey", "language", "split"],
-        "de_train.csv": ["index", "text", "pubkey", "language", "split"],
-        "de_dev.csv":   ["index", "text", "pubkey", "language", "split"],
-        "fr_train.csv": ["index", "text", "pubkey", "language", "split"],
-        "fr_dev.csv":   ["index", "text", "pubkey", "language", "split"],
+        "en_train.csv": ["index", "text", "pubkey"],
+        "en_dev.csv":   ["index", "text", "pubkey"],
+        "de_train.csv": ["index", "text", "pubkey"],
+        "de_dev.csv":   ["index", "text", "pubkey"],
+        "fr_train.csv": ["index", "text", "pubkey"],
+        "fr_dev.csv":   ["index", "text", "pubkey"],
         "collection.csv": ["pubkey", "title", "venue", "authors", "abstract"],
     }
 
@@ -113,8 +113,7 @@ def validate(output_dir: str) -> None:
 def main():
 
     # ── Authenticate ──────────────────────────────────────────────────────────
-    #token = os.environ.get("HUGGING_FACE_HUB_TOKEN")
-    token = "REMOVED"
+    token = os.environ.get("HUGGING_FACE_HUB_TOKEN")
     if not token:
         raise EnvironmentError(
             "HUGGING_FACE_HUB_TOKEN not found. "
@@ -134,7 +133,7 @@ def main():
 
         for split in ["train", "dev"]:
             
-            df = transform_queries(raw_all[split], lang, split)
+            df = transform_queries(raw_all[split])
             load_to_csv(df, f"{lang}_{split}.csv")
 
     # ── Process collection ────────────────────────────────────────────────────

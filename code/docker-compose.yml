@@ -11,6 +11,8 @@ services:
       - ./experiment:/app/experiment
     stdin_open: true
     tty: true
+    env_file:
+      - .env
 
   pyserini:
     build:
@@ -22,3 +24,4 @@ services:
       - ./experiment:/app/experiment
     stdin_open: true
     tty: true
+  

@@ -83,3 +83,5 @@ code/experiment/runs/*
 # VSCode
 .vs/
 .vscode/
+
+.env
