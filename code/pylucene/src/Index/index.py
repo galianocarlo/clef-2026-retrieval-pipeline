@@ -144,10 +144,10 @@ class DirectoryIndexer:
                             
                             # Add ID Field (Stored)
                             # Field.Store.YES means we can retrieve this ID later
-                            doc.add(StringField("id", pd.identifier, Field.Store.YES))
+                            doc.add(StringField("id", pd.id, Field.Store.YES))
                             
                             # Add Body Field (Not Stored, only indexed)
-                            doc.add(Field("body", pd.getBody(), BodyFieldType.TYPE))
+                            doc.add(Field("body", pd.body, BodyFieldType.TYPE))
                             
                             # Write to index
                             self.writer.addDocument(doc)
@@ -175,6 +175,7 @@ class DirectoryIndexer:
         print("#### Indexing complete ####\n")
 
 
+from parse_documents import JsonArrayDocumentParser
 if __name__ == "__main__":
     # 1. Setup paths and parameters
     # Change these to match your Docker container's volume mounts!
@@ -194,14 +195,14 @@ if __name__ == "__main__":
             similarity=similarity,
             ram_buffer_size_mb=256,
             index_path=INDEX_PATH,
-            docs_path=DOCS_PATH, # Make sure this folder exists, even if it has empty text files!
-            extension=".txt",    # Look for any .txt file just to trigger the loop
-            expected_docs=3,     # We expect 3 fake documents
-            parser_class=DummyParser # <--- USE THE FAKE PARSER HERE
-            #docs_path=DOCS_PATH,
-            #extension=".jsonl",
-            #expected_docs=100000, # Put your expected collection size here
-            #parser_class=CollectionParser # <--- Replace with your actual parser class name
+            #docs_path=DOCS_PATH, # Make sure this folder exists, even if it has empty text files!
+            #extension=".txt",    # Look for any .txt file just to trigger the loop
+            #expected_docs=3,     # We expect 3 fake documents
+            #parser_class=DummyParser # <--- USE THE FAKE PARSER HERE
+            docs_path=DOCS_PATH,
+            extension=".jsonl",
+            expected_docs=100000, # Put your expected collection size here
+            parser_class=JsonArrayDocumentParser # <--- Replace with your actual parser class name
         )
         
         # 4. Run the engine
