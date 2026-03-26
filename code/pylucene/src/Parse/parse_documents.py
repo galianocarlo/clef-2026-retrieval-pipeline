@@ -2,6 +2,7 @@ import io
 import importlib
 from abc import ABC, abstractmethod
 import json
+import SpaCy
 
 class ParsedDocument:
     pass
@@ -100,7 +101,10 @@ class DocumentParser:
 class JsonArrayDocumentParser(DocumentParser):
     def __init__(self, in_reader: io.TextIOBase):
         super().__init__(in_reader)
-        self._data = json.load(self._in)
+        self._data = []
+        for line in self._in:
+            if line.strip():
+                self._data.append(json.loads(line))    
         self._iterator = iter(self._data)
 
     def _parse(self) -> ParsedDocument:
@@ -120,7 +124,7 @@ class JsonArrayDocumentParser(DocumentParser):
             raise StopIteration()
 
 if __name__ == "__main__":
-    file_path = "dataset.json" 
+    file_path = "experiment/docs/collection.jsonl" 
     
     try:
         with open(file_path, "r", encoding="utf-8") as f:
@@ -138,8 +142,53 @@ if __name__ == "__main__":
 #Text processing#
 #################
 
-import SpaCy
+import spacy
+import re
+from spacy.util import compile_infix_regex, compile_suffix_regex
+
 class TextProcessor:
-    def __init__(self, stopwords,):
-        self
-        pass
+    def __init__(self, language="en"):
+        model_name = "en_core_web_sm" 
+        try:
+            self.nlp = spacy.load(model_name)
+        except OSError:            
+            spacy.cli.download(model_name)
+            self.nlp = spacy.load(model_name)
+
+        infixes = self.nlp.Defaults.infixes
+        custom_infixes = [rule for rule in infixes if "-" not in str(rule)]
+        self.nlp.tokenizer.infix_finditer = compile_infix_regex(custom_infixes).finditer
+
+        suffixes = self.nlp.Defaults.suffixes
+        custom_suffixes = [rule for rule in suffixes if "%" not in str(rule)]
+        self.nlp.tokenizer.suffix_search = compile_suffix_regex(custom_suffixes).search
+
+    def process(self, text: str):
+        clean_text = re.sub(r'<[^>]+>', '', text)
+        
+        doc = self.nlp(clean_text.lower())
+        
+        tokens = []
+        for token in doc:
+            if not token.is_stop and not token.is_punct and not token.is_space:
+                tokens.append(token.lemma_)
+                
+        return tokens
+
+
+###########
+# TESTING #
+###########
+if __name__ == "__main__":
+    processor = TextProcessor(language="en")
+    
+    complex_text = "The observed efficacy <i>in vitro</i> for the SARS-CoV-2 virus is over 99.9%!!!"
+    
+    print("Original Text:")
+    print(complex_text)
+    print("-" * 40)
+    
+    result = processor.process(complex_text)
+    
+    print("Processed Tokens:")
+    print(result)

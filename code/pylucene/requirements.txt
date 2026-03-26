@@ -2,4 +2,4 @@ datasets
 huggingface_hub
 pandas
 tqdm
-numpy
+SpaCy
