@@ -2,7 +2,7 @@ import io
 import importlib
 from abc import ABC, abstractmethod
 import json
-import SpaCy
+import spacy
 
 class ParsedDocument:
     pass
