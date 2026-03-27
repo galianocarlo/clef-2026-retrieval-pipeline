@@ -21,11 +21,11 @@ assert lucene.getVMEnv() or lucene.initVM(), "Lucene version not available"
 
 # until here is how the professor did
 
-# ---------------------------------------------------------
+"""# ---------------------------------------------------------
 # Assuming ParsedDocument and CollectionParser are defined here
 # (Paste the classes we built earlier here if they aren't in another file)
 class ParsedDocument:
-    """A simplified 'Standard Box' just for testing the indexer."""
+    '''A simplified 'Standard Box' just for testing the indexer.'''
     def __init__(self, doc_id: str, body: str):
         self.identifier = str(doc_id)
         self.body = str(body)
@@ -34,10 +34,10 @@ class ParsedDocument:
         return self.body
 
 class DummyParser:
-    """
-    A fake worker that pretends to read a file, but actually 
-    just spits out 3 fake documents so you can test Lucene.
-    """
+    
+    '''A fake worker that pretends to read a file, but actually 
+    just spits out 3 fake documents so you can test Lucene.'''
+    
     def __init__(self, file_reader):
         # We accept the file_reader so the DirectoryIndexer doesn't crash, 
         # but we completely ignore it for this test.
@@ -59,7 +59,7 @@ class DummyParser:
         except StopIteration:
             raise StopIteration()
 # ---------------------------------------------------------
-
+"""
 class BodyFieldType:
     """
     Replicates the static configuration of BodyField.java.
@@ -178,7 +178,7 @@ class DirectoryIndexer:
 from parse_documents import JsonArrayDocumentParser
 if __name__ == "__main__":
     # 1. Setup paths and parameters
-    # Change these to match your Docker container's volume mounts!
+    
     DOCS_PATH = "./experiment/docs" # Folder where your collection.jsonl is
     INDEX_PATH = "./experiment/index" # Where Lucene will save the database
     
