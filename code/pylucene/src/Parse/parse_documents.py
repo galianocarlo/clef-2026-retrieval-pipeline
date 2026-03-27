@@ -55,33 +55,59 @@ class JsonArrayDocumentParser(DocumentParser):
     
     def __init__(self, in_reader: io.TextIOBase):
         super().__init__(in_reader)
-        self._data = []
+        self.processor = TextProcessor()
+        self.batch_size = 500  # Quanti documenti alla volta diamo in pasto a spaCy
+        self.buffer = []
+        '''
         for line in self._in:
             if line.strip(): # Skip empty lines
                 self._data.append(json.loads(line))    
         self._iterator = iter(self._data)
+        '''
 
     def _parse(self) -> ParsedDocument:
-        try:
-            item = next(self._iterator)
-
-            # Map JSONL fields to ParsedDocument attributes:
-            # - "pubkey" is used as the unique document ID
-            # - "title" and "abstract" are concatenated to form the document body
-            doc_id = str(item.get("pubkey", ""))
-            title = item.get("title", "")
-            abstract = item.get("abstract", "")
+        # Se la scatola è vuota, carica i prossimi 500 documenti
+        if not self.buffer:
+            self._load_next_batch()
             
-            # Combine title and abstract with a newline separator;
-            # strip() removes any leading/trailing whitespace
-            body = f"{title}\n{abstract}".strip()
-            
-            return ParsedDocument(doc_id, body)
-            
-        except StopIteration:
-            # No more documents: signal the iterator protocol to stop
+        # Se dopo aver provato a caricare la scatola è ancora vuota, il file è finito
+        if not self.buffer:
             self._next = False
             raise StopIteration()
+            
+        # Tira fuori un documento dalla scatola e dallo a Lucene
+        return self.buffer.pop(0)
+    
+    def _load_next_batch(self):
+        raw_docs = []
+        
+        # 1. Legge le prossime 'batch_size' righe dal file JSONL
+        for _ in range(self.batch_size):
+            try:
+                line = next(self._in)
+                if line.strip():
+                    item = json.loads(line)
+                    doc_id = str(item.get("pubkey", ""))
+                    title = item.get("title", "")
+                    abstract = item.get("abstract", "")
+                    body = f"{title}\n{abstract}".strip()
+                    # Salviamo ID e testo originale
+                    raw_docs.append((doc_id, body))
+            except StopIteration:
+                break # Abbiamo raggiunto la fine del file
+                
+        if not raw_docs:
+            return
+
+        # 2. Estraiamo solo i testi grezzi per darli a spaCy
+        texts_to_process = [doc[1] for doc in raw_docs]
+        
+        # 3. IL TURBO: Passiamo tutti i testi insieme a nlp.pipe()
+        processed_texts = list(self.processor.process(texts_to_process, batch_size=self.batch_size))
+        
+        # 4. Ricomponiamo i documenti (ID + Testo elaborato) e li mettiamo nel buffer
+        for (doc_id, _), proc_body in zip(raw_docs, processed_texts):
+            self.buffer.append(ParsedDocument(doc_id, proc_body))
 
 # Quick test: prints the first 3 documents from the collection
 if __name__ == "__main__":
@@ -111,11 +137,11 @@ class TextProcessor:
     def __init__(self, language="en"):
         model_name = "en_core_web_sm" 
         try:
-            self.nlp = spacy.load(model_name)
+            self.nlp = spacy.load(model_name, disable=["parser", "ner"])
         except OSError:        
             # If the model is not installed locally, download it automatically    
-            spacy.cli.download(model_name)
-            self.nlp = spacy.load(model_name)
+            spacy.cli.download(model_name, disable=["parser", "ner"])
+            self.nlp = spacy.load(model_name, disable=["parser", "ner"])
 
         # Remove infix rules that split on hyphens ("-") to preserve
         # hyphenated terms as single tokens (e.g. "SARS-CoV-2" stays intact)
@@ -129,21 +155,21 @@ class TextProcessor:
         custom_suffixes = [rule for rule in suffixes if "%" not in str(rule)]
         self.nlp.tokenizer.suffix_search = compile_suffix_regex(custom_suffixes).search
 
-    def process(self, text: str):
-        # Step 1: Strip HTML tags (e.g. <i>, <b>, <sup>) using a regex
-        clean_text = re.sub(r'<[^>]+>', '', text)
+    def process(self, texts, batch_size=500):
+        """Elabora un'intera lista di testi usando nlp.pipe()"""
         
-        # Step 2: Lowercase and run the full spaCy pipeline (tokenization, POS, etc.)
-        doc = self.nlp(clean_text.lower())
+        # Strip HTML tags and lowercase 
+        clean_texts = [re.sub(r'<[^>]+>', '', t).lower() for t in texts]
         
-        # Step 3: Filter tokens — keep only content words (no stopwords, punctuation, spaces)
-        # and return their lemma (base form), e.g. "observed" -> "observe"
-        tokens = []
-        for token in doc:
-            if not token.is_stop and not token.is_punct and not token.is_space:
-                tokens.append(token.lemma_)
-                
-        return tokens
+        # Step 2: Passiamo il blocco a nlp.pipe. 
+        # Ritorna un generatore super-veloce di documenti processati.
+        for doc in self.nlp.pipe(clean_texts, batch_size=batch_size, n_process=-1):
+            tokens = []
+            for token in doc:
+                if not token.is_stop and not token.is_punct and not token.is_space:
+                    tokens.append(token.lemma_)
+            
+            yield " ".join(tokens)
 
 
 ###########
