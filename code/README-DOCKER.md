@@ -216,9 +216,7 @@ docker system prune -a
 |-------------------------------|-----------------------------------|
 |`docker compose build`         |Build both containers              |
 |`docker compose build pylucene`|Build only PyLucene                |
-|`docker compose build pyserini`|Build only Pyserini                |
-|`docker compose run pylucene`  |Enter PyLucene container           |
-|`docker compose run pyserini`  |Enter Pyserini container           |
+|`docker compose run --rm pylucene`  |Enter PyLucene container           |
 |`docker compose down`          |Stop all running containers        |
 |`docker system df`             |Check Docker disk usage            |
 |`docker system prune`          |Remove unused containers and images|
