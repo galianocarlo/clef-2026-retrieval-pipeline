@@ -4,7 +4,14 @@ from datasets import load_dataset
 from huggingface_hub import login
 
 DATASET_ID = "sschellhammer/CT26_Task1_SourceRetrievalForScientificWebClaims"
-OUTPUT_DIR = "experiment/docs"
+# 1. Get the absolute path of the directory where this script lives
+# This will be: C:/.../pylucene/src/
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+
+# 2. Go up TWO levels to reach the project root, then into experiment/docs
+# Path: src -> pylucene -> (Root) -> experiment -> docs
+OUTPUT_DIR = os.path.abspath(os.path.join(SCRIPT_DIR, "..", "..", "experiment", "docs"))
+print(f"Targeting directory: {OUTPUT_DIR}")
 LANGUAGES  = ["en", "de", "fr"]
 
 # extrac from hugging face
