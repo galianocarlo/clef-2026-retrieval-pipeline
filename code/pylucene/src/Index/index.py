@@ -4,6 +4,7 @@ import lucene # need to import otherwise ModuleNotFoundError: No module named 'o
 import sys
 import time
 import os
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))) #adding project root path
 # Core Lucene indexing tools
 from org.apache.lucene.index import IndexWriter, IndexWriterConfig, IndexOptions
 from org.apache.lucene.store import FSDirectory
@@ -13,7 +14,8 @@ from java.nio.file import Paths
 from org.apache.lucene.document import Document, Field, StringField, FieldType
 
 # Text Analysis and Scoring
-from org.apache.lucene.analysis.standard import StandardAnalyzer
+from org.apache.lucene.analysis.core import WhitespaceAnalyzer
+#from org.apache.lucene.analysis.standard import StandardAnalyzer
 from org.apache.lucene.search.similarities import BM25Similarity
 
 ## verify that pyLucene is working and initialize the environment
@@ -154,7 +156,7 @@ class DirectoryIndexer:
                             self.docs_count += 1
                             
                             # Print progress every 10,000 docs
-                            if self.docs_count % 10000 == 0:
+                            if self.docs_count % 100 == 0:
                                 elapsed = int(time.time() - self.start_time)
                                 mb_indexed = self.bytes_count // self.MBYTE
                                 print(f"{self.docs_count} document(s) ({self.files_count} files, "
@@ -175,7 +177,7 @@ class DirectoryIndexer:
         print("#### Indexing complete ####\n")
 
 
-from parse_documents import JsonArrayDocumentParser
+from src.Parse.parse_documents import JsonArrayDocumentParser
 if __name__ == "__main__":
     # 1. Setup paths and parameters
     
@@ -184,7 +186,7 @@ if __name__ == "__main__":
     
     # 2. Configure Analyzer and Similarity
     # StandardAnalyzer handles tokenization, lowercasing, and basic stopword removal
-    analyzer = StandardAnalyzer()
+    analyzer = WhitespaceAnalyzer()
     similarity = BM25Similarity()
     
     # 3. Initialize the Indexer
