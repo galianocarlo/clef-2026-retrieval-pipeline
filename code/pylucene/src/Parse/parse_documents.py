@@ -2,9 +2,15 @@ import io
 import importlib
 from abc import ABC, abstractmethod
 import json
-import spacy
 import re
-from spacy.util import compile_infix_regex, compile_suffix_regex
+import nltk
+from nltk.corpus import stopwords
+from nltk.stem.snowball import SnowballStemmer
+from nltk.tokenize import RegexpTokenizer
+
+from langdetect import detect, LangDetectException
+#import spacy
+#from spacy.util import compile_infix_regex, compile_suffix_regex
 
 
 ##########################################################
@@ -99,13 +105,25 @@ class JsonArrayDocumentParser(DocumentParser):
         if not raw_docs:
             return
 
-        # 2. Estraiamo solo i testi grezzi per darli a spaCy
-        texts_to_process = [doc[1] for doc in raw_docs]
+        # Find out the language of every doc
+        docs_with_lang = []
+        for doc_id, body in raw_docs:
+            try:
+                # detect() returns the language as 'en', 'fr', 'de', 'it'
+                lang_code = detect(body)
+                
+                # Force the english if it's not in the previous 3 languages
+                if lang_code not in ['en', 'fr', 'de']:
+                    lang_code = 'en'
+            except LangDetectException:
+                lang_code = 'en'
+                
+            docs_with_lang.append((body, lang_code))
         
-        # 3. IL TURBO: Passiamo tutti i testi insieme a nlp.pipe()
-        processed_texts = list(self.processor.process(texts_to_process, batch_size=self.batch_size))
+        # 3. Give to the processor list of tuples: [(testo1, 'en'), (testo2, 'fr'), ...]
+        processed_texts = list(self.processor.process_batch(docs_with_lang))
         
-        # 4. Ricomponiamo i documenti (ID + Testo elaborato) e li mettiamo nel buffer
+        # 4. Rebuild all together
         for (doc_id, _), proc_body in zip(raw_docs, processed_texts):
             self.buffer.append(ParsedDocument(doc_id, proc_body))
 
@@ -126,51 +144,62 @@ if __name__ == "__main__":
 
 
 # =============================================================================
-# TEXT PROCESSOR
+# MULTILINGUAL TEXT PROCESSOR (NLTK-based)
 # -----------------------------------------------------------------------------
-# Handles all NLP preprocessing steps needed before indexing or retrieval:
-# HTML stripping, lowercasing, tokenization, stopword removal, and lemmatization.
-# Uses spaCy's English model (en_core_web_sm).
+# Handles English, French, and German text preprocessing.
 # =============================================================================
-
 class TextProcessor:
-    def __init__(self, language="en"):
-        model_name = "en_core_web_sm" 
-        try:
-            self.nlp = spacy.load(model_name, disable=["parser", "ner"])
-        except OSError:        
-            # If the model is not installed locally, download it automatically    
-            spacy.cli.download(model_name, disable=["parser", "ner"])
-            self.nlp = spacy.load(model_name, disable=["parser", "ner"])
-
-        # Remove infix rules that split on hyphens ("-") to preserve
-        # hyphenated terms as single tokens (e.g. "SARS-CoV-2" stays intact)
-        infixes = self.nlp.Defaults.infixes
-        custom_infixes = [rule for rule in infixes if "-" not in str(rule)]
-        self.nlp.tokenizer.infix_finditer = compile_infix_regex(custom_infixes).finditer
-
-        # Remove suffix rules that strip the "%" sign so that percentage values
-        # like "99.9%" are kept as a single token rather than split
-        suffixes = self.nlp.Defaults.suffixes
-        custom_suffixes = [rule for rule in suffixes if "%" not in str(rule)]
-        self.nlp.tokenizer.suffix_search = compile_suffix_regex(custom_suffixes).search
-
-    def process(self, texts, batch_size=500):
-        """Elabora un'intera lista di testi usando nlp.pipe()"""
+    def __init__(self):
+        # We define the languages we want to support
+        self.supported_langs = {
+            "en": "english",
+            "fr": "french",
+            "de": "german"
+        }
         
-        # Strip HTML tags and lowercase 
-        clean_texts = [re.sub(r'<[^>]+>', '', t).lower() for t in texts]
+        self.stop_words = {}
+        self.stemmers = {}
         
-        # Step 2: Passiamo il blocco a nlp.pipe. 
-        # Ritorna un generatore super-veloce di documenti processati.
-        for doc in self.nlp.pipe(clean_texts, batch_size=batch_size, n_process=-1):
-            tokens = []
-            for token in doc:
-                if not token.is_stop and not token.is_punct and not token.is_space:
-                    tokens.append(token.lemma_)
+        # Pre-load stopwords and stemmers for all supported languages
+        for short_code, lang_name in self.supported_langs.items():
+            try:
+                stopwords.words(lang_name)
+            except LookupError:
+                nltk.download('stopwords', quiet=True)
+                
+            self.stop_words[short_code] = set(stopwords.words(lang_name))
+            self.stemmers[short_code] = SnowballStemmer(lang_name)
+        
+        # Fast regex tokenizer
+        self.tokenizer = RegexpTokenizer(r'[A-Za-z0-9%\.\-]+')
+
+    def process(self, text: str, lang_code: str = "en"):
+        """
+        Processes a single string using the correct language tools.
+        Defaults to English ('en') if the language code is unknown.
+        """
+        # Fallback to English if the language is not fr or de
+        if lang_code not in self.supported_langs:
+            lang_code = "en"
             
-            yield " ".join(tokens)
+        clean_text = re.sub(r'<[^>]+>', '', text).lower()
+        tokens = self.tokenizer.tokenize(clean_text)
+        
+        processed_tokens = []
+        for token in tokens:
+            if len(token) > 1 and token not in self.stop_words[lang_code]:
+                stemmed = self.stemmers[lang_code].stem(token)
+                processed_tokens.append(stemmed)
+                
+        return processed_tokens
 
+    def process_batch(self, docs_with_lang):
+        """
+        Expects a list of tuples: [(text1, lang1), (text2, lang2), ...]
+        Yields processed strings.
+        """
+        for text, lang_code in docs_with_lang:
+            yield " ".join(self.process(text, lang_code))
 
 ###########
 # TESTING #
