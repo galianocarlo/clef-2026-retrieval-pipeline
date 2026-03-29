@@ -37,7 +37,7 @@ class ScientificClaimQuery:
         Checks the text against the journal list loaded from journals.txt.
         """
         # We look for each journal name from our list in the raw text
-        found = [j for j in self.journal_list if j.lower() in self.raw_text.lower()]
+        found = [j for j in self.journal_list if j in self.raw_text.lower()]
         return found
 
     def __str__(self):
@@ -66,7 +66,7 @@ class ClaimParser:
             return []
         
         with open(filepath, 'r', encoding='utf-8') as f:
-            return [line.strip() for line in f if line.strip()]
+            return [line.strip().lower() for line in f if line.strip()]
 
     def parse_language_file(self, filename, lang_code):
         # We use the new variable name 'self.data_dir' here!
