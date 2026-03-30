@@ -21,7 +21,7 @@ def main():
 
     # Define the exact paths for the Qrels (Ground Truth) and the Run (Our results)
     # NOTE: You might need to adjust the exact filenames once you have them!
-    qrels_path = os.path.join(EXPERIMENT_DIR, "docs", "qrels.txt") 
+    qrels_path = os.path.join(EXPERIMENT_DIR, "docs", "qrels_dev.txt") 
     run_path = os.path.join(EXPERIMENT_DIR, "runs", "runs-pylucene.txt")
 
     # 2. VALIDATION CHECK
