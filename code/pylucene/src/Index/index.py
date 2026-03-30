@@ -22,46 +22,9 @@ from org.apache.lucene.search.similarities import BM25Similarity
 assert lucene.getVMEnv() or lucene.initVM(), "Lucene version not available"
 
 # until here is how the professor did
+from src.Parse.parse_documents import ParsedDocument, JsonArrayDocumentParser
+from src.Parse.TextProcessor import TextProcessor
 
-"""# ---------------------------------------------------------
-# Assuming ParsedDocument and CollectionParser are defined here
-# (Paste the classes we built earlier here if they aren't in another file)
-class ParsedDocument:
-    '''A simplified 'Standard Box' just for testing the indexer.'''
-    def __init__(self, doc_id: str, body: str):
-        self.identifier = str(doc_id)
-        self.body = str(body)
-
-    def getBody(self):
-        return self.body
-
-class DummyParser:
-    
-    '''A fake worker that pretends to read a file, but actually 
-    just spits out 3 fake documents so you can test Lucene.'''
-    
-    def __init__(self, file_reader):
-        # We accept the file_reader so the DirectoryIndexer doesn't crash, 
-        # but we completely ignore it for this test.
-        self.fake_data = [
-            ParsedDocument("doc_1", "The quick brown fox jumps over the lazy dog."),
-            ParsedDocument("doc_2", "SARS-CoV-2 and COVID-19 research is ongoing."),
-            ParsedDocument("doc_3", "Apache Lucene makes building search engines easy.")
-        ]
-        # Create an iterator out of our fake list
-        self._iterator = iter(self.fake_data)
-
-    def __iter__(self):
-        return self
-
-    def __next__(self):
-        # Spits out one fake document at a time until the list is empty
-        try:
-            return next(self._iterator)
-        except StopIteration:
-            raise StopIteration()
-# ---------------------------------------------------------
-"""
 class BodyFieldType:
     """
     Replicates the static configuration of BodyField.java.
@@ -73,6 +36,10 @@ class BodyFieldType:
     TYPE.setTokenized(True) # Chops the abstract/title into individual words
     TYPE.setStored(False) # Do not store raw text to save space
     TYPE.freeze() # Prevents future changes
+
+    @staticmethod
+    def create(value: str):
+        return Field(ParsedDocument.FIELDS.BODY, value, BodyFieldType.TYPE)
 
 class DirectoryIndexer:
     """
@@ -146,17 +113,19 @@ class DirectoryIndexer:
                             
                             # Add ID Field (Stored)
                             # Field.Store.YES means we can retrieve this ID later
-                            doc.add(StringField("id", pd.id, Field.Store.YES))
+                            doc.add(StringField(ParsedDocument.FIELDS.ID, pd.id, Field.Store.YES))
+
+                            doc.add(StringField("lang", getattr(pd, "lang", "en"), Field.Store.YES)) # keep this for checking the language
                             
                             # Add Body Field (Not Stored, only indexed)
-                            doc.add(Field("body", pd.body, BodyFieldType.TYPE))
+                            doc.add(BodyFieldType.create(pd.body))
                             
                             # Write to index
                             self.writer.addDocument(doc)
                             self.docs_count += 1
                             
                             # Print progress every 10,000 docs
-                            if self.docs_count % 100 == 0:
+                            if self.docs_count % 1000 == 0:
                                 elapsed = int(time.time() - self.start_time)
                                 mb_indexed = self.bytes_count // self.MBYTE
                                 print(f"{self.docs_count} document(s) ({self.files_count} files, "
@@ -179,13 +148,12 @@ class DirectoryIndexer:
 
 from src.Parse.parse_documents import JsonArrayDocumentParser
 if __name__ == "__main__":
-    # 1. Setup paths and parameters
     
-    DOCS_PATH = "./experiment/docs" # Folder where your collection.jsonl is
+    
+    DOCS_PATH = "./experiment/corpus/" # Folder where your collection.jsonl is
     INDEX_PATH = "./experiment/index" # Where Lucene will save the database
     
-    # 2. Configure Analyzer and Similarity
-    # StandardAnalyzer handles tokenization, lowercasing, and basic stopword removal
+    
     analyzer = WhitespaceAnalyzer()
     similarity = BM25Similarity()
     
@@ -197,13 +165,9 @@ if __name__ == "__main__":
             similarity=similarity,
             ram_buffer_size_mb=256,
             index_path=INDEX_PATH,
-            #docs_path=DOCS_PATH, # Make sure this folder exists, even if it has empty text files!
-            #extension=".txt",    # Look for any .txt file just to trigger the loop
-            #expected_docs=3,     # We expect 3 fake documents
-            #parser_class=DummyParser # <--- USE THE FAKE PARSER HERE
             docs_path=DOCS_PATH,
             extension=".jsonl",
-            expected_docs=100000, # Put your expected collection size here
+            expected_docs=34237,
             parser_class=JsonArrayDocumentParser # <--- Replace with your actual parser class name
         )
         
