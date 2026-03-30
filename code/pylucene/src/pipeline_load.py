@@ -14,6 +14,10 @@ OUTPUT_DIR = os.path.abspath(os.path.join(SCRIPT_DIR, "..", "..", "experiment", 
 print(f"Targeting directory: {OUTPUT_DIR}")
 LANGUAGES  = ["en", "de", "fr"]
 
+# Around line 12:
+OUTPUT_DIR = os.path.abspath(os.path.join(SCRIPT_DIR, "..", "experiment", "docs"))
+CORPUS_DIR = os.path.abspath(os.path.join(SCRIPT_DIR, "..", "experiment", "corpus")) # NEW!
+
 # extrac from hugging face
 def extract(language: str) -> dict:
     """Download the raw dataset for a given language from HuggingFace."""
@@ -45,51 +49,67 @@ def transform_collection(raw_dataset) -> pd.DataFrame:
 
 # LOAD
 
-def load_to_jsonl(df: pd.DataFrame, filename: str) -> None:
+def load_to_jsonl(df: pd.DataFrame, filename: str, target_dir: str = OUTPUT_DIR) -> None:
     """Save a DataFrame to JSON Lines (.jsonl) format."""
-    path = os.path.join(OUTPUT_DIR, filename)
+    # Create the directory if it doesn't exist
+    os.makedirs(target_dir, exist_ok=True)
     
-    df.to_json(path, orient="records", lines=True, force_ascii=False) # https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.to_json.html
+    path = os.path.join(target_dir, filename)
+    df.to_json(path, orient="records", lines=True, force_ascii=False)
     print(f"  [LOAD] Saved {len(df)} rows -> {path}")
 
 # VALIDATION
 
-def validate(output_dir: str) -> None:
-    """Basic validation: reload all JSONL files and print a summary."""
+def validate(output_dir: str, corpus_dir: str) -> None:
+    """Basic validation: reload all JSONL files, check schemas, and verify row counts."""
     print("\n  [VALIDATE] Reloading and checking output files...")
 
-    
+    # We map the filename to its expected columns, its specific folder, and an optional row count
     expected_files = {
-        "en_train.jsonl": ["index", "text", "pubkey"],
-        "en_dev.jsonl":   ["index", "text", "pubkey"],
-        "de_train.jsonl": ["index", "text", "pubkey"],
-        "de_dev.jsonl":   ["index", "text", "pubkey"],
-        "fr_train.jsonl": ["index", "text", "pubkey"],
-        "fr_dev.jsonl":   ["index", "text", "pubkey"],
-        "collection.jsonl": ["pubkey", "title", "venue", "authors", "abstract"],
+        "en_train.jsonl":   {"cols": ["index", "text", "pubkey"], "dir": output_dir},
+        "en_dev.jsonl":     {"cols": ["index", "text", "pubkey"], "dir": output_dir},
+        "de_train.jsonl":   {"cols": ["index", "text", "pubkey"], "dir": output_dir},
+        "de_dev.jsonl":     {"cols": ["index", "text", "pubkey"], "dir": output_dir},
+        "fr_train.jsonl":   {"cols": ["index", "text", "pubkey"], "dir": output_dir},
+        "fr_dev.jsonl":     {"cols": ["index", "text", "pubkey"], "dir": output_dir},
+        # We explicitly enforce the 34,237 row count for the collection!
+        "collection.jsonl": {"cols": ["pubkey", "title", "venue", "authors", "abstract"], 
+                             "dir": corpus_dir, 
+                             "expected_rows": 10000}, # https://huggingface.co/datasets/sschellhammer/CT26_Task1_SourceRetrievalForScientificWebClaims/viewer/collection
     }
 
     all_ok = True
-    for filename, expected_cols in expected_files.items():
-        path = os.path.join(output_dir, filename)
+    for filename, rules in expected_files.items():
+        path = os.path.join(rules["dir"], filename)
+        
         if not os.path.exists(path):
-            print(f"    MISSING: {filename}")
+            print(f"    [❌] MISSING FILE: {path}")
             all_ok = False
             continue
 
-
+        # Load the JSONL to verify it isn't corrupted
         df = pd.read_json(path, orient="records", lines=True)
 
-        missing_cols = [c for c in expected_cols if c not in df.columns]
+        # 1. Check Columns
+        missing_cols = [c for c in rules["cols"] if c not in df.columns]
         if missing_cols:
-            print(f"    MISSING COLUMNS in {filename}: {missing_cols}")
+            print(f"    [❌] MISSING COLUMNS in {filename}: {missing_cols}")
+            all_ok = False
+            continue
+            
+        # 2. Check Row Counts (if we provided an expected_rows rule)
+        actual_rows = len(df)
+        expected_rows = rules.get("expected_rows")
+        
+        if expected_rows and actual_rows != expected_rows:
+            print(f"    [❌] ROW MISMATCH in {filename}: Expected {expected_rows}, got {actual_rows}")
             all_ok = False
             continue
 
-        print(f"    OK  {filename:20s}  rows: {len(df):<6}  cols: {list(df.columns)}")
+        print(f"    [✅] OK  {filename:20s}  rows: {actual_rows:<6}  cols: {list(df.columns)}")
 
     if all_ok:
-        print("\n  All files validated successfully.")
+        print("\n  All files validated successfully. Data is pristine.")
     else:
         print("\n  Some files have issues — check the output above.")
 
@@ -129,11 +149,11 @@ def main():
     raw_col = extract_collection()
     
     df_col  = transform_collection(raw_col)
-    load_to_jsonl(df_col, "collection.jsonl")
+    load_to_jsonl(df_col, "collection.jsonl", target_dir=CORPUS_DIR)
 
     # Check for be sure
     print(f"\n{'─' * 40}")
-    validate(OUTPUT_DIR)
+    validate(OUTPUT_DIR, CORPUS_DIR)
     print(f"{'─' * 40}")
     print("\nETL pipeline completed successfully.")
     print(f"Output files are in: {OUTPUT_DIR}/")
