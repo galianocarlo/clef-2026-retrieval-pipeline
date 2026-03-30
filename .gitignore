@@ -75,6 +75,7 @@ tomcat-logs/
 # Docker experiment outputs - index and docs are auto-generated, ignore them
 code/experiment/index/
 code/experiment/docs/
+code/experiment/corpus/
 
 # Keep runs folder tracked but ignore its contents except .gitkeep
 code/experiment/runs/*
