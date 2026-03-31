@@ -107,35 +107,34 @@ if __name__ == "__main__":
 
 class TextProcessor:
     def __init__(self, language="en"):
-        model_name = "en_core_web_sm" 
+        models = {
+            "en": "en_core_web_sm",
+            "fr": "fr_core_news_sm",
+            "de": "de_core_news_sm",
+            "it": "it_core_news_sm",
+            "es": "es_core_news_sm"
+        }
+        
+        model_name = models.get(language, "en_core_web_sm")
+        
         try:
             self.nlp = spacy.load(model_name)
         except OSError:        
-            # If the model is not installed locally, download it automatically    
             spacy.cli.download(model_name)
             self.nlp = spacy.load(model_name)
 
-        # Remove infix rules that split on hyphens ("-") to preserve
-        # hyphenated terms as single tokens (e.g. "SARS-CoV-2" stays intact)
         infixes = self.nlp.Defaults.infixes
         custom_infixes = [rule for rule in infixes if "-" not in str(rule)]
         self.nlp.tokenizer.infix_finditer = compile_infix_regex(custom_infixes).finditer
 
-        # Remove suffix rules that strip the "%" sign so that percentage values
-        # like "99.9%" are kept as a single token rather than split
         suffixes = self.nlp.Defaults.suffixes
         custom_suffixes = [rule for rule in suffixes if "%" not in str(rule)]
         self.nlp.tokenizer.suffix_search = compile_suffix_regex(custom_suffixes).search
 
     def process(self, text: str):
-        # Step 1: Strip HTML tags (e.g. <i>, <b>, <sup>) using a regex
         clean_text = re.sub(r'<[^>]+>', '', text)
-        
-        # Step 2: Lowercase and run the full spaCy pipeline (tokenization, POS, etc.)
         doc = self.nlp(clean_text.lower())
         
-        # Step 3: Filter tokens — keep only content words (no stopwords, punctuation, spaces)
-        # and return their lemma (base form), e.g. "observed" -> "observe"
         tokens = []
         for token in doc:
             if not token.is_stop and not token.is_punct and not token.is_space:
@@ -143,20 +142,21 @@ class TextProcessor:
                 
         return tokens
 
-
-###########
-# TESTING #
-###########
 if __name__ == "__main__":
-    processor = TextProcessor(language="en")
+    processor_en = TextProcessor(language="en")
+    processor_fr = TextProcessor(language="fr")
+    processor_de = TextProcessor(language="de")
+    processor_it = TextProcessor(language="it")
+    processor_es = TextProcessor(language="es")
     
-    complex_text = "The observed efficacy <i>in vitro</i> for the SARS-CoV-2 virus is over 99.9%!!!"
+    text_en = "The observed efficacy <i>in vitro</i> for the SARS-CoV-2 virus is over 99.9%!!!"
+    text_fr = "L'efficacité observée <i>in vitro</i> pour le virus SARS-CoV-2 est supérieure à 99,9%!!!"
+    text_de = "Die beobachtete Wirksamkeit <i>in vitro</i> für das SARS-CoV-2-Virus liegt bei über 99,9%!!!"
+    text_it = "L'efficacia osservata <i>in vitro</i> per il virus SARS-CoV-2 è superiore al 99,9%!!!"
+    text_es = "¡La eficacia observada <i>in vitro</i> para el virus SARS-CoV-2 es superior al 99,9%!!!"
     
-    print("Original Text:")
-    print(complex_text)
-    print("-" * 40)
-    
-    result = processor.process(complex_text)
-    
-    print("Processed Tokens:")
-    print(result)
+    print(processor_en.process(text_en))
+    print(processor_fr.process(text_fr))
+    print(processor_de.process(text_de))
+    print(processor_it.process(text_it))
+    print(processor_es.process(text_es))
