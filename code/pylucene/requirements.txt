@@ -5,3 +5,5 @@ tqdm
 #spacy
 nltk
 langdetect
+numpy
+ranx
