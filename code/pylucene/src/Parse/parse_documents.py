@@ -14,13 +14,14 @@ class ParsedDocument:
     # Simple data container representing a single document from the collection.
     # - id   : unique document identifier (mapped from the "pubkey" field)
     # - body : concatenation of title and abstract, used as the searchable text
-    def __init__(self, doc_id: str, body: str):
+    def __init__(self, doc_id: str, title: str, abstact: str):
         self.id = doc_id
-        self.body = body
+        self.title = title
+        self.abstract = abstact
 
     def __str__(self):
         # Truncates body for readable debug output
-        return f"ID: {self.id}\nBody: {self.body[:100]}...\n"
+        return f"ID: {self.id}\nTitle: {self.title}\nAbstract: {self.abstract[:100]}...\n"
 
 class DocumentParser:
     # Base parser class implementing the iterator protocol (__iter__ / __next__)
@@ -67,16 +68,13 @@ class JsonArrayDocumentParser(DocumentParser):
 
             # Map JSONL fields to ParsedDocument attributes:
             # - "pubkey" is used as the unique document ID
-            # - "title" and "abstract" are concatenated to form the document body
+           
             doc_id = str(item.get("pubkey", ""))
             title = item.get("title", "")
             abstract = item.get("abstract", "")
-            
-            # Combine title and abstract with a newline separator;
-            # strip() removes any leading/trailing whitespace
-            body = f"{title}\n{abstract}".strip()
-            
-            return ParsedDocument(doc_id, body)
+              
+
+            return ParsedDocument(doc_id, title, abstract)
             
         except StopIteration:
             # No more documents: signal the iterator protocol to stop
