@@ -20,9 +20,10 @@ class ParsedDocument:
     # Simple data container representing a single document from the collection.
     # - id   : unique document identifier (mapped from the "pubkey" field)
     # - body : concatenation of title and abstract, used as the searchable text
-    def __init__(self, doc_id: str, body: str):
+    def __init__(self, doc_id: str, body: str, lang_code: str = "en"):
         self.id = doc_id
         self.body = body
+        self.lang = lang_code
         # we will divide body into each field (abstract, authours and more important lang (we could use it for improving the indexer and searcher))
 
     def __str__(self):
@@ -119,8 +120,8 @@ class JsonArrayDocumentParser(DocumentParser):
         processed_texts = list(self.processor.process_batch(docs_with_lang))
         
         # 4. Rebuild all together
-        for (doc_id, _), proc_body in zip(raw_docs, processed_texts):
-            self.buffer.append(ParsedDocument(doc_id, proc_body))
+        for (doc_id, _), (_, lang_code), proc_body in zip(raw_docs, docs_with_lang, processed_texts):
+            self.buffer.append(ParsedDocument(doc_id, proc_body, lang_code))
 
 # Quick test: prints the first 3 documents from the collection
 if __name__ == "__main__":

@@ -19,7 +19,8 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspa
 from src.Parse.parse_documents import ParsedDocument
 #from src.Parse.parse_query import ScientificClaimQuery, load_journals
 from src.Parse.parse_query import ClaimParser
-
+from src.Parse.TextProcessor import TextProcessor
+processor = TextProcessor()
 # Initialize PyLucene
 assert lucene.getVMEnv() or lucene.initVM(), "Lucene version not available"
 
@@ -72,6 +73,9 @@ class Searcher:
                 # --- A. THE MAIN QUERY (The cleaned tweet) ---
                 clean_text = topic.get_search_query()
                 if clean_text:
+                    # Stemming the queries
+                    stemmed_tokens = processor.process(clean_text, topic.language)
+                    stemmed_text = " ".join(stemmed_tokens)
                     # Escape special characters so Lucene doesn't crash on weird math symbols
                     escaped_title = QueryParserBase.escape(clean_text)
                     title_query = self.qp.parse(escaped_title)

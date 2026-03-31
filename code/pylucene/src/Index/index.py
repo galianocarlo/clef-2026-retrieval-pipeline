@@ -150,7 +150,7 @@ from src.Parse.parse_documents import JsonArrayDocumentParser
 if __name__ == "__main__":
     
     
-    DOCS_PATH = "./experiment/corpus/" # Folder where your collection.jsonl is
+    DOCS_PATH = "./experiment/docs/" # Folder where your collection.jsonl is
     INDEX_PATH = "./experiment/index" # Where Lucene will save the database
     
     
