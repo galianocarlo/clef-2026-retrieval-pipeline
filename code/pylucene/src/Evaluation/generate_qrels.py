@@ -16,7 +16,7 @@ def generate_qrels():
     # 1. PATH RESOLUTION
     SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
     # Navigate UP three levels to reach the 'code' folder, then DOWN to 'experiment/docs'
-    DOCS_DIR = os.path.abspath(os.path.join(SCRIPT_DIR, "..", "..", "..", "experiment", "docs"))
+    DOCS_DIR = os.path.abspath(os.path.join(SCRIPT_DIR, "..", "..", "experiment", "docs"))
     
     # Output file path
     output_qrels_path = os.path.join(DOCS_DIR, "qrels_dev.txt")

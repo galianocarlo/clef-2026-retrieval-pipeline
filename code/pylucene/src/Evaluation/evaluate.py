@@ -17,12 +17,12 @@ def main():
     SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
     
     # Navigate UP three levels to reach the 'code' folder, then DOWN to 'experiment'
-    EXPERIMENT_DIR = os.path.abspath(os.path.join(SCRIPT_DIR, "..", "..", "..", "experiment"))
+    EXPERIMENT_DIR = os.path.abspath(os.path.join(SCRIPT_DIR, "..", "..", "experiment"))
 
     # Define the exact paths for the Qrels (Ground Truth) and the Run (Our results)
     # NOTE: You might need to adjust the exact filenames once you have them!
     qrels_path = os.path.join(EXPERIMENT_DIR, "docs", "qrels_dev.txt") 
-    run_path = os.path.join(EXPERIMENT_DIR, "runs", "runs-pylucene.txt")
+    run_path = os.path.join(EXPERIMENT_DIR, "runs", "seupd-baseline-run.txt")
 
     # 2. VALIDATION CHECK
     if not os.path.exists(qrels_path):
