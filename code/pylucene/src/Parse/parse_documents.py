@@ -16,19 +16,21 @@ class ParsedDocument:
     # Single Source of Truth
     class FIELDS:
         ID = "id"
-        BODY = "body"
+        TITLE = "title"
+        ABSTRACT = "abstract"
     # Simple data container representing a single document from the collection.
     # - id   : unique document identifier (mapped from the "pubkey" field)
     # - body : concatenation of title and abstract, used as the searchable text
-    def __init__(self, doc_id: str, body: str, lang_code: str = "en"):
+    def __init__(self, doc_id: str, title: str, abstract: str, lang_code: str = "en"):
         self.id = doc_id
-        self.body = body
+        self.title = title
+        self.abstract = abstract
         self.lang = lang_code
         # we will divide body into each field (abstract, authours and more important lang (we could use it for improving the indexer and searcher))
 
     def __str__(self):
         # Truncates body for readable debug output
-        return f"ID: {self.id}\nBody: {self.body[:100]}...\n"
+        return f"ID: {self.id}\nTitle: {self.title}\nAbstract : {self.abstract[:100]}...\n"
 
 class DocumentParser(ABC):
     # Base parser class implementing the iterator protocol (__iter__ / __next__)
@@ -92,9 +94,9 @@ class JsonArrayDocumentParser(DocumentParser):
                     doc_id = str(item.get("pubkey", ""))
                     title = item.get("title", "")
                     abstract = item.get("abstract", "")
-                    body = f"{title}\n{abstract}".strip()
-                    # Salviamo ID e testo originale
-                    raw_docs.append((doc_id, body))
+                    
+                    # Salviamo ID, titolo e contenuto
+                    raw_docs.append((doc_id, title, abstract))
             except StopIteration:
                 break # Abbiamo raggiunto la fine del file
                 
@@ -102,11 +104,13 @@ class JsonArrayDocumentParser(DocumentParser):
             return
 
         # Find out the language of every doc
-        docs_with_lang = []
-        for doc_id, body in raw_docs:
+        docs_with_lang_title = []
+        docs_with_lang_abstract = []
+        
+        for doc_id, title, abstract in raw_docs:
             try:
                 # detect() returns the language as 'en', 'fr', 'de', 'it'
-                lang_code = detect(body)
+                lang_code = detect(f"{title} {abstract}")
                 
                 # Force the english if it's not in the previous 3 languages
                 if lang_code not in ['en', 'fr', 'de']:
@@ -114,15 +118,17 @@ class JsonArrayDocumentParser(DocumentParser):
             except LangDetectException:
                 lang_code = 'en'
                 
-            docs_with_lang.append((body, lang_code))
+            docs_with_lang_title.append((title, lang_code))
+            docs_with_lang_abstract.append((abstract, lang_code))
         
         # 3. Give to the processor list of tuples: [(testo1, 'en'), (testo2, 'fr'), ...]
-        processed_texts = list(self.processor.process_batch(docs_with_lang))
+        processed_titles = list(self.processor.process_batch(docs_with_lang_title))
+        processed_abstracts = list(self.processor.process_batch(docs_with_lang_abstract))
         
         # 4. Rebuild all together
-        for (doc_id, _), (_, lang_code), proc_body in zip(raw_docs, docs_with_lang, processed_texts):
-            self.buffer.append(ParsedDocument(doc_id, proc_body, lang_code))
-
+        for (doc_id, _, _), (_, lang_code), proc_title, proc_abstract in zip(raw_docs, docs_with_lang_title, processed_titles, processed_abstracts):
+            self.buffer.append(ParsedDocument(doc_id, proc_title, proc_abstract, lang_code))
+            
 # Quick test: prints the first 3 documents from the collection
 if __name__ == "__main__":
     file_path = "experiment/docs/collection.jsonl" 
