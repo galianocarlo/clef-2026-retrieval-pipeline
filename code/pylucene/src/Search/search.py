@@ -17,7 +17,8 @@ from org.apache.lucene.search.similarities import BM25Similarity
 # Import our custom parsers
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 from src.Parse.parse_documents import ParsedDocument
-from src.Parse.parse_query import ScientificClaimQuery, load_journals
+#from src.Parse.parse_query import ScientificClaimQuery, load_journals
+from src.Parse.parse_query import ClaimParser
 
 # Initialize PyLucene
 assert lucene.getVMEnv() or lucene.initVM(), "Lucene version not available"
@@ -69,16 +70,19 @@ class Searcher:
                 bq_builder = BooleanQuery.Builder()
 
                 # --- A. THE MAIN QUERY (The cleaned tweet) ---
-                if topic.title:
+                clean_text = topic.get_search_query()
+                if clean_text:
                     # Escape special characters so Lucene doesn't crash on weird math symbols
-                    escaped_title = QueryParserBase.escape(topic.title)
+                    escaped_title = QueryParserBase.escape(clean_text)
                     title_query = self.qp.parse(escaped_title)
                     # SHOULD means "Match these words if possible"
                     bq_builder.add(title_query, BooleanClause.Occur.SHOULD)
 
                 # --- B. THE BOOST QUERY (The extracted journals) ---
-                if topic.description:
-                    escaped_desc = QueryParserBase.escape(topic.description)
+                journals_found = topic.extract_entities()
+                if journals_found:
+                    journals_text = " ".join(journals_found) # Tranform the list in a string
+                    escaped_desc = QueryParserBase.escape(journals_text)
                     desc_query = self.qp.parse(escaped_desc)
                     # Adding this as another SHOULD clause naturally boosts the BM25 score 
                     # if the document contains the journal name!
@@ -86,7 +90,7 @@ class Searcher:
                 
                 # --- C. THE LANGUAGE FILTER (The CheckThat! requirement) ---
                 # MUST means "If the document is not this language, drop it instantly"
-                lang_term = TermQuery(Term("lang", topic.lang))
+                lang_term = TermQuery(Term("lang", topic.language))
                 bq_builder.add(lang_term, BooleanClause.Occur.MUST)
 
                 # Finalize the query
@@ -102,7 +106,7 @@ class Searcher:
                     doc_id = doc.get(ParsedDocument.FIELDS.ID)
                     
                     # Format: query_id Q0 doc_id rank score run_id
-                    line = f"{topic.id}\tQ0\t{doc_id}\t{rank}\t{sd.score:.6f}\t{self.run_id}\n"
+                    line = f"{topic.query_id}\tQ0\t{doc_id}\t{rank}\t{sd.score:.6f}\t{self.run_id}\n"
                     run_file.write(line)
 
         elapsed = int(time.time() - start_time)
@@ -140,8 +144,10 @@ if __name__ == "__main__":
     # Load Journals
     #journals_list = ClaimParser.load_journals(filepath =JOURNALS_PATH)
     # since there is an error I call it as it is an utility function
-    journals_list = load_journals(JOURNALS_PATH)
-
+    
+    #journals_list = load_journals(JOURNALS_PATH)
+    claim_parser = ClaimParser(data_dir=DATA_FOLDER, journals_file=JOURNALS_PATH)
+    
     # Define the batches of queries to process
     tasks = [
         {"file": "en_dev.jsonl", "lang": "en", "expected": 195},
@@ -149,7 +155,7 @@ if __name__ == "__main__":
         {"file": "fr_dev.jsonl", "lang": "fr", "expected": 100}
     ]
 
-    try:
+    '''try:
         # loop through languages and search!
         for task in tasks:
             file_path = os.path.join(DATA_FOLDER, task["file"])
@@ -160,6 +166,20 @@ if __name__ == "__main__":
             with open(file_path, 'r', encoding='utf-8') as f:
                 parser = ScientificClaimQuery(f, journals_list=journals_list, lang_code=task["lang"])
                 engine.search_topics(parser, task["expected"])
+                
+    finally:
+        engine.close()
+        print(f"\n#### All Searching Complete! Results saved to {RUNS_PATH} ####")'''
+    try:
+        # loop through languages and search!
+        for task in tasks:
+            print(f"Elaborazione del file: {task['file']}")
+            
+            # Usiamo ClaimParser per estrarre la lista delle query dal file
+            queries_iterator = claim_parser.parse_language_file(task["file"], task["lang"])
+            
+            # Passiamo l'iteratore pieno di query al motore di ricerca
+            engine.search_topics(queries_iterator, task["expected"])
                 
     finally:
         engine.close()
