@@ -8,7 +8,7 @@ from java.nio.file import Paths
 from org.apache.lucene.index import DirectoryReader, Term
 from org.apache.lucene.store import FSDirectory
 from org.apache.lucene.search import IndexSearcher, BooleanQuery, BooleanClause, TermQuery
-from org.apache.lucene.queryparser.classic import QueryParser, QueryParserBase
+from org.apache.lucene.queryparser.classic import QueryParser, QueryParserBase, MultiFieldQueryParser
 
 # Text Analysis and Scoring (Must match the Indexer exactly!)
 from org.apache.lucene.analysis.core import WhitespaceAnalyzer
@@ -39,8 +39,11 @@ class Searcher:
         self.searcher = IndexSearcher(self.reader)
         self.searcher.setSimilarity(similarity)
 
-        # 2. Setup the Query Parser (Default search field is the BODY)
-        self.qp = QueryParser(ParsedDocument.FIELDS.BODY, analyzer)
+        # 2. Setup the Query Parser (Search in both TITLE and ABSTRACT)
+        fields_to_search = [ParsedDocument.FIELDS.TITLE, ParsedDocument.FIELDS.ABSTRACT]
+        
+        # Implementing MultiFieldQueryParser
+        self.qp = MultiFieldQueryParser(fields_to_search, analyzer)
         
         # 3. Setup the Output File
         self.run_id = run_id
@@ -78,7 +81,7 @@ class Searcher:
                     stemmed_text = " ".join(stemmed_tokens)
                     # Escape special characters so Lucene doesn't crash on weird math symbols
                     escaped_title = QueryParserBase.escape(clean_text)
-                    title_query = self.qp.parse(escaped_title)
+                    title_query = QueryParserBase.parse(self.qp, escaped_title)
                     # SHOULD means "Match these words if possible"
                     bq_builder.add(title_query, BooleanClause.Occur.SHOULD)
 
@@ -87,7 +90,7 @@ class Searcher:
                 if journals_found:
                     journals_text = " ".join(journals_found) # Tranform the list in a string
                     escaped_desc = QueryParserBase.escape(journals_text)
-                    desc_query = self.qp.parse(escaped_desc)
+                    desc_query = QueryParserBase.parse(self.qp, escaped_desc)
                     # Adding this as another SHOULD clause naturally boosts the BM25 score 
                     # if the document contains the journal name!
                     bq_builder.add(desc_query, BooleanClause.Occur.SHOULD)

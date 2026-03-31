@@ -111,14 +111,14 @@ class DirectoryIndexer:
                         for pd in parser:
                             doc = Document()
                             
-                            # Add ID Field (Stored)
                             # Field.Store.YES means we can retrieve this ID later
+                            # Add ID Field and Lang Field
                             doc.add(StringField(ParsedDocument.FIELDS.ID, pd.id, Field.Store.YES))
-
-                            doc.add(StringField("lang", getattr(pd, "lang", "en"), Field.Store.YES)) # keep this for checking the language
+                            doc.add(StringField("lang", getattr(pd, "lang", "en"), Field.Store.YES))
                             
-                            # Add Body Field (Not Stored, only indexed)
-                            doc.add(BodyFieldType.create(pd.body))
+                            # Add TITLE and ABSTRACT (Usiamo lo stesso BodyFieldType perché vogliamo le stesse regole per entrambi)
+                            doc.add(Field(ParsedDocument.FIELDS.TITLE, pd.title, BodyFieldType.TYPE))
+                            doc.add(Field(ParsedDocument.FIELDS.ABSTRACT, pd.abstract, BodyFieldType.TYPE))
                             
                             # Write to index
                             self.writer.addDocument(doc)
