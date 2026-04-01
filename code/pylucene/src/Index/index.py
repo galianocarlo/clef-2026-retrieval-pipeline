@@ -178,7 +178,7 @@ if __name__ == "__main__":
     
     
     #analyzer = WhitespaceAnalyzer()
-    similarity = BM25Similarity()
+    similarity = BM25Similarity(0.9, 0.8)
     # Initialize analyzers
     analyzer_map = HashMap()
     
