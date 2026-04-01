@@ -19,8 +19,20 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspa
 from src.Parse.parse_documents import ParsedDocument
 #from src.Parse.parse_query import ScientificClaimQuery, load_journals
 from src.Parse.parse_query import ClaimParser
-from src.Parse.TextProcessor import TextProcessor
-processor = TextProcessor()
+
+# =============================
+# == IMPORTING NEW ANALYZERS ==
+# =============================
+from java.util import HashMap
+from org.apache.lucene.analysis.standard import StandardAnalyzer
+from org.apache.lucene.analysis.miscellaneous import PerFieldAnalyzerWrapper
+from org.apache.lucene.analysis.en import EnglishAnalyzer
+from org.apache.lucene.analysis.fr import FrenchAnalyzer
+from org.apache.lucene.analysis.de import GermanAnalyzer
+#from src.Parse.TextProcessor import TextProcessor
+#processor = TextProcessor()
+
+
 # Initialize PyLucene
 assert lucene.getVMEnv() or lucene.initVM(), "Lucene version not available"
 
@@ -39,6 +51,7 @@ class Searcher:
         self.searcher = IndexSearcher(self.reader)
         self.searcher.setSimilarity(similarity)
 
+        self.analyzer = analyzer
         # 2. Setup the Query Parser (Search in both TITLE and ABSTRACT)
         fields_to_search = [ParsedDocument.FIELDS.TITLE, ParsedDocument.FIELDS.ABSTRACT]
         
@@ -73,15 +86,21 @@ class Searcher:
                 topics_count += 1
                 bq_builder = BooleanQuery.Builder()
 
+                # --- NOVITÀ: Costruiamo il Parser in base alla lingua della query ---
+                lang = topic.language
+                fields_to_search = [f"{ParsedDocument.FIELDS.TITLE}_{lang}", f"{ParsedDocument.FIELDS.ABSTRACT}_{lang}"]
+
+                # Passiamo i campi dinamici al QueryParser
+                qp = MultiFieldQueryParser(fields_to_search, self.analyzer)
                 # --- A. THE MAIN QUERY (The cleaned tweet) ---
                 clean_text = topic.get_search_query()
                 if clean_text:
                     # Stemming the queries
-                    stemmed_tokens = processor.process(clean_text, topic.language)
-                    stemmed_text = " ".join(stemmed_tokens)
+                    # stemmed_tokens = processor.process(clean_text, topic.language)
+                    # stemmed_text = " ".join(stemmed_tokens)
                     # Escape special characters so Lucene doesn't crash on weird math symbols
-                    escaped_title = QueryParserBase.escape(stemmed_text)
-                    title_query = QueryParserBase.parse(self.qp, escaped_title)
+                    escaped_title = QueryParserBase.escape(clean_text)
+                    title_query = QueryParserBase.parse(qp, escaped_title)
                     # SHOULD means "Match these words if possible"
                     bq_builder.add(title_query, BooleanClause.Occur.SHOULD)
 
@@ -134,16 +153,30 @@ if __name__ == "__main__":
     DATA_FOLDER = os.path.abspath(os.path.join(SCRIPT_DIR, "..", "..", "experiment", "docs"))
     JOURNALS_PATH = os.path.abspath(os.path.join(SCRIPT_DIR, "..", "Parse", "journals.txt"))
 
-    # we use the same analyzer as for Indexer
-    analyzer = WhitespaceAnalyzer()
+    #analyzer = WhitespaceAnalyzer()
     similarity = BM25Similarity()
+    # Initialize analyzers
+    analyzer_map = HashMap()
     
+    # English
+    analyzer_map.put(f"{ParsedDocument.FIELDS.TITLE}_en", EnglishAnalyzer())
+    analyzer_map.put(f"{ParsedDocument.FIELDS.ABSTRACT}_en", EnglishAnalyzer())
+    
+    # French
+    analyzer_map.put(f"{ParsedDocument.FIELDS.TITLE}_fr", FrenchAnalyzer())
+    analyzer_map.put(f"{ParsedDocument.FIELDS.ABSTRACT}_fr", FrenchAnalyzer())
+    
+    # German
+    analyzer_map.put(f"{ParsedDocument.FIELDS.TITLE}_de", GermanAnalyzer())
+    analyzer_map.put(f"{ParsedDocument.FIELDS.ABSTRACT}_de", GermanAnalyzer())
+
+    multi_analyzer = PerFieldAnalyzerWrapper(StandardAnalyzer(), analyzer_map)
     # Initialize the Searcher
     engine = Searcher(
-        analyzer=analyzer,
+        analyzer=multi_analyzer,
         similarity=similarity,
         index_path=INDEX_PATH,
-        run_id="seupd-baseline-run",
+        run_id="run-native-analyzers",
         run_path=RUNS_PATH,
         max_docs_retrieved=1000  # TREC standard requires top 1000
     )

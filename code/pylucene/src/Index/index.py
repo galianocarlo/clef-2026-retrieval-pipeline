@@ -23,7 +23,18 @@ assert lucene.getVMEnv() or lucene.initVM(), "Lucene version not available"
 
 # until here is how the professor did
 from src.Parse.parse_documents import ParsedDocument, JsonArrayDocumentParser
-from src.Parse.TextProcessor import TextProcessor
+# =============================
+# == IMPORTING NEW ANALYZERS ==
+# =============================
+from java.util import HashMap
+from org.apache.lucene.analysis.standard import StandardAnalyzer
+from org.apache.lucene.analysis.miscellaneous import PerFieldAnalyzerWrapper
+from org.apache.lucene.analysis.en import EnglishAnalyzer
+from org.apache.lucene.analysis.fr import FrenchAnalyzer
+from org.apache.lucene.analysis.de import GermanAnalyzer
+#from src.Parse.TextProcessor import TextProcessor
+
+
 
 class BodyFieldType:
     """
@@ -34,7 +45,7 @@ class BodyFieldType:
     TYPE = FieldType()
     TYPE.setIndexOptions(IndexOptions.DOCS_AND_FREQS) 
     TYPE.setTokenized(True) # Chops the abstract/title into individual words
-    TYPE.setStored(True) # Do not store raw text to save space (SAVING NOW for Luke)
+    TYPE.setStored(True) # Do not store raw text to save space (SAVING NOW for Luke debugging)
     TYPE.freeze() # Prevents future changes
 
     @staticmethod
@@ -117,8 +128,16 @@ class DirectoryIndexer:
                             doc.add(StringField("lang", getattr(pd, "lang", "en"), Field.Store.YES))
                             
                             # Add TITLE and ABSTRACT (Usiamo lo stesso BodyFieldType perché vogliamo le stesse regole per entrambi)
-                            doc.add(Field(ParsedDocument.FIELDS.TITLE, pd.title, BodyFieldType.TYPE))
-                            doc.add(Field(ParsedDocument.FIELDS.ABSTRACT, pd.abstract, BodyFieldType.TYPE))
+                            # doc.add(Field(ParsedDocument.FIELDS.TITLE, pd.title, BodyFieldType.TYPE))
+                            # doc.add(Field(ParsedDocument.FIELDS.ABSTRACT, pd.abstract, BodyFieldType.TYPE))
+                            
+                            # Creiamo i campi dinamici in base alla lingua (es. TITLE_en, ABSTRACT_fr)
+                            lang = getattr(pd, "lang", "en") # Assicuriamoci che ci sia sempre una lingua
+                            title_field = f"{ParsedDocument.FIELDS.TITLE}_{lang}"
+                            abstract_field = f"{ParsedDocument.FIELDS.ABSTRACT}_{lang}"
+
+                            doc.add(Field(title_field, pd.title, BodyFieldType.TYPE))
+                            doc.add(Field(abstract_field, pd.abstract, BodyFieldType.TYPE))
                             
                             # Write to index
                             self.writer.addDocument(doc)
@@ -154,14 +173,30 @@ if __name__ == "__main__":
     INDEX_PATH = "./experiment/index" # Where Lucene will save the database
     
     
-    analyzer = WhitespaceAnalyzer()
+    #analyzer = WhitespaceAnalyzer()
     similarity = BM25Similarity()
+    # Initialize analyzers
+    analyzer_map = HashMap()
     
+    # English
+    analyzer_map.put(f"{ParsedDocument.FIELDS.TITLE}_en", EnglishAnalyzer())
+    analyzer_map.put(f"{ParsedDocument.FIELDS.ABSTRACT}_en", EnglishAnalyzer())
+    
+    # French
+    analyzer_map.put(f"{ParsedDocument.FIELDS.TITLE}_fr", FrenchAnalyzer())
+    analyzer_map.put(f"{ParsedDocument.FIELDS.ABSTRACT}_fr", FrenchAnalyzer())
+    
+    # German
+    analyzer_map.put(f"{ParsedDocument.FIELDS.TITLE}_de", GermanAnalyzer())
+    analyzer_map.put(f"{ParsedDocument.FIELDS.ABSTRACT}_de", GermanAnalyzer())
+
+    multi_analyzer = PerFieldAnalyzerWrapper(StandardAnalyzer(), analyzer_map)
+
     # 3. Initialize the Indexer
     # We pass the CollectionParser class we built previously
     try:
         indexer = DirectoryIndexer(
-            analyzer=analyzer,
+            analyzer=multi_analyzer,
             similarity=similarity,
             ram_buffer_size_mb=256,
             index_path=INDEX_PATH,
