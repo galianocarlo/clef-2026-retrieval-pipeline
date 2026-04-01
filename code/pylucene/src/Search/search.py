@@ -80,7 +80,7 @@ class Searcher:
                     stemmed_tokens = processor.process(clean_text, topic.language)
                     stemmed_text = " ".join(stemmed_tokens)
                     # Escape special characters so Lucene doesn't crash on weird math symbols
-                    escaped_title = QueryParserBase.escape(clean_text)
+                    escaped_title = QueryParserBase.escape(stemmed_text)
                     title_query = QueryParserBase.parse(self.qp, escaped_title)
                     # SHOULD means "Match these words if possible"
                     bq_builder.add(title_query, BooleanClause.Occur.SHOULD)
