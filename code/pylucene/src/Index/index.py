@@ -135,9 +135,13 @@ class DirectoryIndexer:
                             lang = getattr(pd, "lang", "en") # Assicuriamoci che ci sia sempre una lingua
                             title_field = f"{ParsedDocument.FIELDS.TITLE}_{lang}"
                             abstract_field = f"{ParsedDocument.FIELDS.ABSTRACT}_{lang}"
+                            
+                            # Replace "-" with ""
+                            title_no_hyphens = pd.title.replace("-", "") if pd.title else ""
+                            abstract_no_hyphens = pd.abstract.replace("-", "") if pd.abstract else ""
 
-                            doc.add(Field(title_field, pd.title, BodyFieldType.TYPE))
-                            doc.add(Field(abstract_field, pd.abstract, BodyFieldType.TYPE))
+                            doc.add(Field(title_field, title_no_hyphens, BodyFieldType.TYPE))
+                            doc.add(Field(abstract_field, abstract_no_hyphens, BodyFieldType.TYPE))
                             
                             # Write to index
                             self.writer.addDocument(doc)
