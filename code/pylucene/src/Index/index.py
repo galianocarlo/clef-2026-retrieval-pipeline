@@ -34,7 +34,7 @@ class BodyFieldType:
     TYPE = FieldType()
     TYPE.setIndexOptions(IndexOptions.DOCS_AND_FREQS) 
     TYPE.setTokenized(True) # Chops the abstract/title into individual words
-    TYPE.setStored(False) # Do not store raw text to save space
+    TYPE.setStored(True) # Do not store raw text to save space (SAVING NOW for Luke)
     TYPE.freeze() # Prevents future changes
 
     @staticmethod
