@@ -53,8 +53,14 @@ class Searcher:
 
         self.analyzer = analyzer
         # 2. Setup the Query Parser (Search in both TITLE and ABSTRACT)
-        fields_to_search = [ParsedDocument.FIELDS.TITLE, ParsedDocument.FIELDS.ABSTRACT]
+        #fields_to_search = [ParsedDocument.FIELDS.TITLE, ParsedDocument.FIELDS.ABSTRACT]
         
+        # 2. Testing langdetect bugs that I (Carlo) swa in Luke
+        fields_to_search = [
+            "title_en", "abstract_en", 
+            "title_de", "abstract_de", 
+            "title_fr", "abstract_fr"
+        ]
         # Implementing MultiFieldQueryParser
         self.qp = MultiFieldQueryParser(fields_to_search, analyzer)
         
@@ -87,8 +93,15 @@ class Searcher:
                 bq_builder = BooleanQuery.Builder()
 
                 # --- NOVITÀ: Costruiamo il Parser in base alla lingua della query ---
+                # Testing langdetect bugs
                 lang = topic.language
-                fields_to_search = [f"{ParsedDocument.FIELDS.TITLE}_{lang}", f"{ParsedDocument.FIELDS.ABSTRACT}_{lang}"]
+                #fields_to_search = [f"{ParsedDocument.FIELDS.TITLE}_{lang}", f"{ParsedDocument.FIELDS.ABSTRACT}_{lang}"]
+                if lang == "en":
+                    # L'inglese basta a se stesso: evitiamo il "rumore" delle altre lingue
+                    fields_to_search = ["title_en", "abstract_en"]
+                else:
+                    # Il DE e il FR hanno bisogno della loro lingua + il bacino globale inglese
+                    fields_to_search = [f"title_{lang}", f"abstract_{lang}", "title_en", "abstract_en"]
 
                 # Passiamo i campi dinamici al QueryParser
                 qp = MultiFieldQueryParser(fields_to_search, self.analyzer)
@@ -120,7 +133,8 @@ class Searcher:
                 # --- C. THE LANGUAGE FILTER (The CheckThat! requirement) ---
                 # MUST means "If the document is not this language, drop it instantly"
                 lang_term = TermQuery(Term("lang", topic.language))
-                bq_builder.add(lang_term, BooleanClause.Occur.MUST)
+                
+                #bq_builder.add(lang_term, BooleanClause.Occur.MUST) # Testing langedetect bugs
 
                 # Finalize the query
                 final_query = bq_builder.build()
