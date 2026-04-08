@@ -42,7 +42,8 @@ def generate_qrels():
                 
                 try:
                     entry = json.loads(line)
-                    query_id = str(entry.get("index", ""))
+                    lang_prefix = filename[:2].upper()
+                    query_id = f"{lang_prefix}_{str(entry.get('index', ''))}"
                     doc_id = str(entry.get("pubkey", ""))
                     
                     # If both fields exist, format them according to TREC standard

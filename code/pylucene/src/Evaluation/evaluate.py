@@ -48,11 +48,11 @@ def main():
     # 4. COMPUTE METRICS
     # We evaluate using the most common metrics for CLEF/TREC tasks:
     # - map: Mean Average Precision (overall ranking quality)
-    # - mrr: Mean Reciprocal Rank (how high is the first relevant document)
+    # - mrr@5: Mean Reciprocal Rank for the top 5 (how high is the first relevant document)
     # - ndcg@10: Normalized Discounted Cumulative Gain for the top 10 results
     print("Computing metrics...\n")
-    metrics = ["map", "mrr", "ndcg@10"]
-    results_dict = evaluate(qrels, run, metrics)
+    metrics = ["mrr@5", "map", "ndcg@10"]
+    results_dict = evaluate(qrels, run, metrics, make_comparable=True)
 
     # 5. DISPLAY OFFICIAL RESULTS
     print("=======================================")
@@ -62,6 +62,40 @@ def main():
         # Print the score formatted to 4 decimal places
         print(f" {metric.upper():<10}: {score:.4f}")
     print("=======================================\n")
+
+
+    # 6. COMPUTE METRICS BY LANGUAGE
+    print("=======================================")
+    print("      RESULTS BY LANGUAGE              ")
+    print("=======================================")
+    
+    # DEFINISCI QUI LE TUE LINGUE (sigle attese nei query_id)
+    languages = ["EN", "DE", "FR"] 
+
+    # Estraiamo i dizionari di base da ranx per poterli filtrare
+    qrels_dict = qrels.to_dict()
+    run_dict = run.to_dict()
+
+    for lang in languages:
+        # Filtriamo le query: teniamo solo quelle in cui la sigla della lingua appare nel query_id
+        lang_qrels_dict = {q_id: data for q_id, data in qrels_dict.items() if lang in str(q_id).upper()}
+        lang_run_dict = {q_id: data for q_id, data in run_dict.items() if lang in str(q_id).upper()}
+
+        # Procediamo alla valutazione solo se ci sono effettivamente query per questa lingua
+        if lang_qrels_dict and lang_run_dict:
+            # Ricreiamo gli oggetti Qrels e Run specifici per la lingua
+            lang_qrels = Qrels(lang_qrels_dict)
+            lang_run = Run(lang_run_dict)
+            
+            lang_results = evaluate(lang_qrels, lang_run, metrics, make_comparable=True)
+            
+            print(f"--- Language: {lang} ---")
+            for metric, score in lang_results.items():
+                print(f" {metric.upper():<10}: {score:.4f}")
+            print() # Riga vuota per separare
+        else:
+            print(f"--- Language: {lang} ---")
+            print(" [!] Nessuna query trovata nel file di test per questa lingua.\n")
 
 if __name__ == "__main__":
     main()

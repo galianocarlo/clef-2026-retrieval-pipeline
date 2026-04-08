@@ -135,7 +135,7 @@ class Searcher:
                     doc_id = doc.get(ParsedDocument.FIELDS.ID)
                     
                     # Format: query_id Q0 doc_id rank score run_id
-                    line = f"{topic.query_id}\tQ0\t{doc_id}\t{rank}\t{sd.score:.6f}\t{self.run_id}\n"
+                    line = f"{topic.language.upper()}_{topic.query_id}\tQ0\t{doc_id}\t{rank}\t{sd.score:.6f}\t{self.run_id}\n"
                     run_file.write(line)
 
         elapsed = int(time.time() - start_time)
