@@ -4,7 +4,7 @@ from abc import ABC, abstractmethod
 import json
 import re
 from langdetect import detect, LangDetectException
-from src.Parse.TextProcessor import TextProcessor
+#from src.Parse.TextProcessor import TextProcessor
 
 # TO DO
 # Update ParsedDocument.FIELDS to include ABSTRACT, AUTHOR, VENUE, and LANG.
@@ -65,7 +65,7 @@ class JsonArrayDocumentParser(DocumentParser):
     
     def __init__(self, in_reader: io.TextIOBase):
         super().__init__(in_reader)
-        self.processor = TextProcessor()
+        #self.processor = TextProcessor()
         self.batch_size = 500  # number of lines we take
         self.buffer = []
 
@@ -117,7 +117,9 @@ class JsonArrayDocumentParser(DocumentParser):
                     lang_code = 'en'
             except LangDetectException:
                 lang_code = 'en'
-                
+            
+            self.buffer.append(ParsedDocument(doc_id, title, abstract, lang_code))
+            '''    
             docs_with_lang_title.append((title, lang_code))
             docs_with_lang_abstract.append((abstract, lang_code))
         
@@ -128,7 +130,7 @@ class JsonArrayDocumentParser(DocumentParser):
         # 4. Rebuild all together
         for (doc_id, _, _), (_, lang_code), proc_title, proc_abstract in zip(raw_docs, docs_with_lang_title, processed_titles, processed_abstracts):
             self.buffer.append(ParsedDocument(doc_id, proc_title, proc_abstract, lang_code))
-            
+        '''    
 # Quick test: prints the first 3 documents from the collection
 if __name__ == "__main__":
     file_path = "experiment/docs/collection.jsonl" 
