@@ -194,6 +194,10 @@ if __name__ == "__main__":
     analyzer_map.put(f"{ParsedDocument.FIELDS.TITLE}_de", GermanAnalyzer())
     analyzer_map.put(f"{ParsedDocument.FIELDS.ABSTRACT}_de", GermanAnalyzer())
 
+    # Other languages 
+    analyzer_map.put(f"{ParsedDocument.FIELDS.TITLE}_other", StandardAnalyzer())
+    analyzer_map.put(f"{ParsedDocument.FIELDS.ABSTRACT}_other", StandardAnalyzer())
+    
     multi_analyzer = PerFieldAnalyzerWrapper(StandardAnalyzer(), analyzer_map)
 
     # 3. Initialize the Indexer

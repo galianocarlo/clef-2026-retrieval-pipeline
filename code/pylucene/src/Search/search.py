@@ -92,16 +92,16 @@ class Searcher:
                 topics_count += 1
                 bq_builder = BooleanQuery.Builder()
 
-                # --- NOVITÀ: Costruiamo il Parser in base alla lingua della query ---
+                # --- Building the Parser w.r.t. languages of the queries ---
                 # Testing langdetect bugs
                 lang = topic.language
                 #fields_to_search = [f"{ParsedDocument.FIELDS.TITLE}_{lang}", f"{ParsedDocument.FIELDS.ABSTRACT}_{lang}"]
                 if lang == "en":
-                    # L'inglese basta a se stesso: evitiamo il "rumore" delle altre lingue
-                    fields_to_search = ["title_en", "abstract_en"]
+                    # English + Other languages
+                    fields_to_search = ["title_en", "abstract_en", "title_other", "abstract_other"]
                 else:
-                    # Il DE e il FR hanno bisogno della loro lingua + il bacino globale inglese
-                    fields_to_search = [f"title_{lang}", f"abstract_{lang}", "title_en", "abstract_en"]
+                    # Native language + English + Other languages
+                    fields_to_search = [f"title_{lang}", f"abstract_{lang}", "title_en", "abstract_en", "title_other", "abstract_other"]
 
                 # Passiamo i campi dinamici al QueryParser
                 qp = MultiFieldQueryParser(fields_to_search, self.analyzer)

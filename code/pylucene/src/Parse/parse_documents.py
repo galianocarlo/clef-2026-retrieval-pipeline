@@ -114,9 +114,9 @@ class JsonArrayDocumentParser(DocumentParser):
                 
                 # Force the english if it's not in the previous 3 languages
                 if lang_code not in ['en', 'fr', 'de']:
-                    lang_code = 'en'
+                    lang_code = 'other'
             except LangDetectException:
-                lang_code = 'en'
+                lang_code = 'other'
             
             self.buffer.append(ParsedDocument(doc_id, title, abstract, lang_code))
             '''    
