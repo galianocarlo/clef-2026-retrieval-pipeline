@@ -1,6 +1,6 @@
 import os
 from ranx import Qrels, Run, evaluate
-
+import sys
 # =============================================================================
 # SEARCH ENGINE EVALUATOR (TREC Format)
 # -----------------------------------------------------------------------------
@@ -22,7 +22,12 @@ def main():
     # Define the exact paths for the Qrels (Ground Truth) and the Run (Our results)
     # NOTE: You might need to adjust the exact filenames once you have them!
     qrels_path = os.path.join(EXPERIMENT_DIR, "docs", "qrels_dev.txt") 
-    run_path = os.path.join(EXPERIMENT_DIR, "runs", "run-native-analyzers.txt")
+    if len(sys.argv) > 1:
+        # Se riceve un file dal terminale, usa quello
+        run_path = sys.argv[1] 
+    else:
+        # Altrimenti usa quello di default (metti qui quello che avevi prima)
+        run_path = os.path.join(EXPERIMENT_DIR, "runs", "run-hybrid-best.txt")
 
     # 2. VALIDATION CHECK
     if not os.path.exists(qrels_path):

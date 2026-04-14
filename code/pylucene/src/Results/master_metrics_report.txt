@@ -1,0 +1,238 @@
+=========================================================
+   SEUPD 25/26 - GLOBAL RUN METRICS REPORT               
+=========================================================
+
+📁 RUN FILE: run-hybrid-best-prf.txt
+📝 DESCRIPTION: V3 + PRF (Experimental): Hybrid pipeline built on the PRF expansion, combining BM25+PRF for English with Neural+PRF re-ranking for DE and FR.
+----------------------------------------
+=== Starting Search Engine Evaluation ===
+
+Loading Qrels (Ground Truth)...
+Loading Run (Search Engine Results)...
+Computing metrics...
+
+=======================================
+          OFFICIAL RESULTS             
+=======================================
+ MRR@5     : 0.3862
+ MAP       : 0.3974
+ NDCG@10   : 0.4233
+=======================================
+
+=======================================
+      RESULTS BY LANGUAGE              
+=======================================
+--- Language: EN ---
+ MRR@5     : 0.4386
+ MAP       : 0.4507
+ NDCG@10   : 0.4810
+
+--- Language: DE ---
+ MRR@5     : 0.1556
+ MAP       : 0.1652
+ NDCG@10   : 0.1730
+
+--- Language: FR ---
+ MRR@5     : 0.2210
+ MAP       : 0.2285
+ NDCG@10   : 0.2400
+
+
+
+************************************************************
+
+📁 RUN FILE: run-hybrid-best.txt
+📝 DESCRIPTION: V3 (Final): Hybrid pipeline combining BM25 lexical precision for English with neural re-ranking for DE and FR.
+----------------------------------------
+=== Starting Search Engine Evaluation ===
+
+Loading Qrels (Ground Truth)...
+Loading Run (Search Engine Results)...
+Computing metrics...
+
+=======================================
+          OFFICIAL RESULTS             
+=======================================
+ MRR@5     : 0.4298
+ MAP       : 0.4408
+ NDCG@10   : 0.4601
+=======================================
+
+=======================================
+      RESULTS BY LANGUAGE              
+=======================================
+--- Language: EN ---
+ MRR@5     : 0.4919
+ MAP       : 0.5036
+ NDCG@10   : 0.5254
+
+--- Language: DE ---
+ MRR@5     : 0.1653
+ MAP       : 0.1760
+ NDCG@10   : 0.1839
+
+--- Language: FR ---
+ MRR@5     : 0.2295
+ MAP       : 0.2372
+ NDCG@10   : 0.2488
+
+
+
+************************************************************
+
+📁 RUN FILE: run-native-analyzers-prf.txt
+📝 DESCRIPTION: V2: BM25 enhanced with Pseudo-Relevance Feedback (PRF) for medical term expansion.
+----------------------------------------
+=== Starting Search Engine Evaluation ===
+
+Loading Qrels (Ground Truth)...
+Loading Run (Search Engine Results)...
+Computing metrics...
+
+=======================================
+          OFFICIAL RESULTS             
+=======================================
+ MRR@5     : 0.3583
+ MAP       : 0.3707
+ NDCG@10   : 0.3969
+=======================================
+
+=======================================
+      RESULTS BY LANGUAGE              
+=======================================
+--- Language: EN ---
+ MRR@5     : 0.4386
+ MAP       : 0.4507
+ NDCG@10   : 0.4810
+
+--- Language: DE ---
+ MRR@5     : 0.0959
+ MAP       : 0.1071
+ NDCG@10   : 0.1218
+
+--- Language: FR ---
+ MRR@5     : 0.0560
+ MAP       : 0.0708
+ NDCG@10   : 0.0806
+
+
+
+************************************************************
+
+📁 RUN FILE: run-native-analyzers.txt
+📝 DESCRIPTION: V1: Base asymmetric search using PyLucene, BM25, and native multilingual analyzers.
+----------------------------------------
+=== Starting Search Engine Evaluation ===
+
+Loading Qrels (Ground Truth)...
+Loading Run (Search Engine Results)...
+Computing metrics...
+
+=======================================
+          OFFICIAL RESULTS             
+=======================================
+ MRR@5     : 0.4017
+ MAP       : 0.4138
+ NDCG@10   : 0.4331
+=======================================
+
+=======================================
+      RESULTS BY LANGUAGE              
+=======================================
+--- Language: EN ---
+ MRR@5     : 0.4919
+ MAP       : 0.5036
+ NDCG@10   : 0.5254
+
+--- Language: DE ---
+ MRR@5     : 0.1072
+ MAP       : 0.1190
+ NDCG@10   : 0.1330
+
+--- Language: FR ---
+ MRR@5     : 0.0614
+ MAP       : 0.0766
+ NDCG@10   : 0.0852
+
+
+
+************************************************************
+
+📁 RUN FILE: run-neural-reranked-prf.txt
+📝 DESCRIPTION: V2 + Neural: Semantic re-ranking applied to the PRF-expanded run (our 'trawl net' approach).
+----------------------------------------
+=== Starting Search Engine Evaluation ===
+
+Loading Qrels (Ground Truth)...
+Loading Run (Search Engine Results)...
+Computing metrics...
+
+=======================================
+          OFFICIAL RESULTS             
+=======================================
+ MRR@5     : 0.3065
+ MAP       : 0.3220
+ NDCG@10   : 0.3405
+=======================================
+
+=======================================
+      RESULTS BY LANGUAGE              
+=======================================
+--- Language: EN ---
+ MRR@5     : 0.3367
+ MAP       : 0.3543
+ NDCG@10   : 0.3751
+
+--- Language: DE ---
+ MRR@5     : 0.1556
+ MAP       : 0.1652
+ NDCG@10   : 0.1730
+
+--- Language: FR ---
+ MRR@5     : 0.2210
+ MAP       : 0.2285
+ NDCG@10   : 0.2400
+
+
+
+************************************************************
+
+📁 RUN FILE: run-neural-reranked.txt
+📝 DESCRIPTION: V1 + Neural: Semantic re-ranking of the V1 Top 100 using a HuggingFace Cross-Encoder.
+----------------------------------------
+=== Starting Search Engine Evaluation ===
+
+Loading Qrels (Ground Truth)...
+Loading Run (Search Engine Results)...
+Computing metrics...
+
+=======================================
+          OFFICIAL RESULTS             
+=======================================
+ MRR@5     : 0.3107
+ MAP       : 0.3268
+ NDCG@10   : 0.3446
+=======================================
+
+=======================================
+      RESULTS BY LANGUAGE              
+=======================================
+--- Language: EN ---
+ MRR@5     : 0.3396
+ MAP       : 0.3579
+ NDCG@10   : 0.3777
+
+--- Language: DE ---
+ MRR@5     : 0.1653
+ MAP       : 0.1760
+ NDCG@10   : 0.1839
+
+--- Language: FR ---
+ MRR@5     : 0.2295
+ MAP       : 0.2372
+ NDCG@10   : 0.2488
+
+
+
+************************************************************
+
