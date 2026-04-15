@@ -103,7 +103,7 @@ class Searcher:
                 qp = MultiFieldQueryParser(fields_to_search, self.analyzer)
                 clean_text = topic.get_search_query()
                 
-                # --- A. LUCENE SEARCH (BM25) ---
+                # --- PREPARAZIONE QUERY LUCENE ---
                 if clean_text:
                     clean_text_no_hyphens = clean_text.replace("-", "")
                     escaped_title = QueryParserBase.escape(clean_text_no_hyphens)
@@ -118,40 +118,58 @@ class Searcher:
                     bq_builder.add(desc_query, BooleanClause.Occur.SHOULD)
 
                 final_query = bq_builder.build()
-                top_docs = self.searcher.search(final_query, 30) # Get Top 30
-                lucene_ids = [stored_fields.document(sd.doc).get(ParsedDocument.FIELDS.ID) for sd in top_docs.scoreDocs]
 
-                # --- B. FAISS SEARCH (Vector) ---
-                q_vec = self.dense_model.encode([clean_text], show_progress_bar=False)
-                q_vec = np.array(q_vec, dtype=np.float32)
-                faiss.normalize_L2(q_vec)
-                _, indices = self.faiss_index.search(q_vec, 100) # Get Top 100
-                faiss_ids = [self.faiss_doc_ids[idx] for idx in indices[0] if idx < len(self.faiss_doc_ids)]
-
-                # --- C. FUSION AND PREPARATION ---
-                candidate_ids = list(set(lucene_ids + faiss_ids)) # Remove duplicates
-                pairs = []
-                valid_ids = []
-                
-                for d_id in candidate_ids:
-                    d_text = self._get_doc_text(d_id, lang)
-                    if d_text.strip():
-                        pairs.append([clean_text, d_text])
-                        valid_ids.append(d_id)
-
-                # --- D. NEURAL RE-RANKING ---
-                if pairs:
-                    # The AI reads the documents and assigns a semantic score
-                    scores = self.reranker.predict(pairs)
+                # ====================================================
+                # LO SWITCH ASIMMETRICO (IL "ROUTER")
+                # ====================================================
+                if lang == "en":
+                    # 🔥 PERCORSO VELOCE: SOLO BM25 (Inglese) 🔥
+                    # Chiediamo direttamente a PyLucene solo i Top 5 definitivi
+                    top_docs = self.searcher.search(final_query, self.max_docs) 
                     
-                    # Sort from highest to lowest score
-                    ranked_results = sorted(zip(valid_ids, scores), key=lambda x: x[1], reverse=True)
-                    
-                    # Save the Final Top 5 in the TREC file
-                    for rank, (doc_id, score) in enumerate(ranked_results[:self.max_docs]):
+                    for rank, sd in enumerate(top_docs.scoreDocs):
+                        doc_id = stored_fields.document(sd.doc).get(ParsedDocument.FIELDS.ID)
+                        score = sd.score
+                        # Scriviamo direttamente nel file TREC usando lo score di BM25
                         line = f"{lang.upper()}_{topic.query_id}\tQ0\t{doc_id}\t{rank}\t{score:.6f}\t{self.run_id}\n"
                         run_file.write(line)
+                        
+                else:
+                    # 🧠 PERCORSO INTELLIGENTE: IBRIDO + NEURALE (Tedesco e Francese) 🧠
+                    # Chiediamo a PyLucene 30 documenti da passare poi all'AI
+                    top_docs = self.searcher.search(final_query, 30) 
+                    lucene_ids = [stored_fields.document(sd.doc).get(ParsedDocument.FIELDS.ID) for sd in top_docs.scoreDocs]
 
+                    # --- B. FAISS SEARCH (Vector) ---
+                    q_vec = self.dense_model.encode([clean_text], show_progress_bar=False)
+                    q_vec = np.array(q_vec, dtype=np.float32)
+                    faiss.normalize_L2(q_vec)
+                    _, indices = self.faiss_index.search(q_vec, 100) # Prende i Top 100
+                    faiss_ids = [self.faiss_doc_ids[idx] for idx in indices[0] if idx < len(self.faiss_doc_ids)]
+
+                    # --- C. FUSIONE E PREPARAZIONE ---
+                    candidate_ids = list(set(lucene_ids + faiss_ids)) # Rimuove i duplicati
+                    pairs = []
+                    valid_ids = []
+                    
+                    for d_id in candidate_ids:
+                        d_text = self._get_doc_text(d_id, lang)
+                        if d_text.strip():
+                            pairs.append([clean_text, d_text])
+                            valid_ids.append(d_id)
+
+                    # --- D. NEURAL RE-RANKING ---
+                    if pairs:
+                        # L'AI valuta semanticamente i documenti di DE e FR
+                        scores = self.reranker.predict(pairs)
+                        
+                        # Ordina dal punteggio più alto al più basso
+                        ranked_results = sorted(zip(valid_ids, scores), key=lambda x: x[1], reverse=True)
+                        
+                        # Salva i Top 5 nel file TREC
+                        for rank, (doc_id, score) in enumerate(ranked_results[:self.max_docs]):
+                            line = f"{lang.upper()}_{topic.query_id}\tQ0\t{doc_id}\t{rank}\t{score:.6f}\t{self.run_id}\n"
+                            run_file.write(line)
                 # Small visual feedback so you don't worry while waiting
                 if topics_count % 10 == 0:
                     print(f" -> {topics_count}/{expected_topics} queries completed...")
