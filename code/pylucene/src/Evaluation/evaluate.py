@@ -56,7 +56,7 @@ def main():
     # - mrr@5: Mean Reciprocal Rank for the top 5 (how high is the first relevant document)
     # - ndcg@10: Normalized Discounted Cumulative Gain for the top 10 results
     print("Computing metrics...\n")
-    metrics = ["mrr@5", "map", "ndcg@10"]
+    metrics = ["mrr@5", "map", "ndcg@10", "precision@1", "recall@1000"]
     results_dict = evaluate(qrels, run, metrics, make_comparable=True)
 
     # 5. DISPLAY OFFICIAL RESULTS
