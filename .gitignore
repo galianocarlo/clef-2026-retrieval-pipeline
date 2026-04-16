@@ -85,4 +85,7 @@ code/experiment/runs/*
 .vs/
 .vscode/
 
+# remove folders or file not necessary
+.code/pyserini/
+code\pylucene\src\hello-ir.py
 .env
