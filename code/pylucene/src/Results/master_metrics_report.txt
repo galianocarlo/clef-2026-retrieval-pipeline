@@ -6,7 +6,7 @@
 -----------------------------------------------------------------------------------------------------------------------------
 | Pos | Run File                         | MRR@5   | P@1     | R@1000  | Descrizione
 -----------------------------------------------------------------------------------------------------------------------------
-| 1   | run-hybrid-reranked.txt          | 0.4573  | 0.4058  | 0.5370   | V4 (Full Hybrid): Integration of lexical (BM25) and dense (FAISS) retrieval, with semantic re-ranking across all languages (improved EN, dropped DE/FR).
+| 1   | run-hybrid-reranked.txt          | 0.4573  | 0.4058  | 0.5370   | V4 (Asymmetric Hybrid): Language-routed pipeline using pure lexical BM25 for English queries, and a Dense+Lexical Hybrid approach with Neural Re-ranking strictly for German and French.
 | 2   | run-hybrid-best.txt              | 0.4283  | 0.3835  | 0.7703   | V3 (Final): Hybrid pipeline combining BM25 lexical precision for English with neural re-ranking for DE and FR.
 | 3   | run-native-analyzers.txt         | 0.3984  | 0.3559  | 0.8185   | V1: Base asymmetric search using PyLucene, BM25, and native multilingual analyzers.
 | 4   | run-hybrid-best-prf.txt          | 0.3862  | 0.3212  | 0.7697   | V3 + PRF (Experimental): Hybrid pipeline built on the PRF expansion, combining BM25+PRF for English with Neural+PRF re-ranking for DE and FR.
@@ -20,7 +20,7 @@
 
 🏆 Posizione in classifica: 1
 📁 RUN FILE: run-hybrid-reranked.txt
-📝 DESCRIPTION: V4 (Full Hybrid): Integration of lexical (BM25) and dense (FAISS) retrieval, with semantic re-ranking across all languages (improved EN, dropped DE/FR).
+📝 DESCRIPTION: V4 (Asymmetric Hybrid): Language-routed pipeline using pure lexical BM25 for English queries, and a Dense+Lexical Hybrid approach with Neural Re-ranking strictly for German and French.
 ----------------------------------------
 === Starting Search Engine Evaluation ===
 

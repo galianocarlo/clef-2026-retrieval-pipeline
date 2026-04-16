@@ -12,7 +12,7 @@ DESCRIPTIONS = {
     "run-neural-reranked-prf.txt": "V2 + Neural: Semantic re-ranking applied to the PRF-expanded run.",
     "run-hybrid-best.txt": "V3 (Final): Hybrid pipeline combining BM25 lexical precision for English with neural re-ranking for DE and FR.",
     "run-hybrid-best-prf.txt": "V3 + PRF (Experimental): Hybrid pipeline built on the PRF expansion, combining BM25+PRF for English with Neural+PRF re-ranking for DE and FR.",
-    "run-hybrid-reranked.txt": "V4 (Full Hybrid): Integration of lexical (BM25) and dense (FAISS) retrieval, with semantic re-ranking across all languages (improved EN, dropped DE/FR)."
+    "run-hybrid-reranked.txt": "V4 (Asymmetric Hybrid): Language-routed pipeline using pure lexical BM25 for English queries, and a Dense+Lexical Hybrid approach with Neural Re-ranking strictly for German and French."
 }
 
 def main():

@@ -55,6 +55,7 @@ This directory contains the results of different search configurations. Each fil
 * **`run-neural-reranked-prf.txt`**: Results of Neural Re-ranking applied to the expanded PRF run (V2). This is our most powerful semantic evaluation.
 * **`run-hybrid-best.txt`**: Best merged run (V3). A "Frankenstein" pipeline combining precise BM25 lexical matching for English with neural semantic understanding for German and French.
 * **`run-hybrid-best-prf.txt`**: "V3 + PRF (Experimental): Hybrid pipeline built on the PRF expansion, combining BM25+PRF for English with Neural+PRF re-ranking for DE and FR."
+* **`run-hybrid-reranked.txt`**: "V4 (Asymmetric Hybrid): Language-routed pipeline using pure lexical BM25 for English queries, and a Dense+Lexical Hybrid approach with Neural Re-ranking strictly for German and French."
 
 ### 2. `pylucene/src/Evaluation/` (Scoring & Merging)
 
