@@ -127,12 +127,25 @@ class Searcher:
                     # Chiediamo direttamente a PyLucene solo i Top 5 definitivi
                     top_docs = self.searcher.search(final_query, self.max_docs) 
                     
+                    results_written = 0
+
                     for rank, sd in enumerate(top_docs.scoreDocs):
                         doc_id = stored_fields.document(sd.doc).get(ParsedDocument.FIELDS.ID)
                         score = sd.score
                         # Scriviamo direttamente nel file TREC usando lo score di BM25
                         line = f"{lang.upper()}_{topic.query_id}\tQ0\t{doc_id}\t{rank}\t{score:.6f}\t{self.run_id}\n"
                         run_file.write(line)
+
+                        results_written += 1
+                        
+                    while results_written < self.max_docs:
+                        # TAPPABUCHI per evaluation CLEF
+                        fallback_doc_id = self.faiss_doc_ids[results_written] 
+                        
+                        line = f"{lang.upper()}_{topic.query_id}\tQ0\t{fallback_doc_id}\t{results_written}\t0.000001\t{self.run_id}\n"
+                        run_file.write(line)
+                        results_written += 1
+                        
                         
                 else:
                     # 🧠 PERCORSO INTELLIGENTE: IBRIDO + NEURALE (Tedesco e Francese) 🧠
