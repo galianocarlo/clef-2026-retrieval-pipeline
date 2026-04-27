@@ -1,4 +1,4 @@
-import os
+'''import os
 import sys
 import zipfile
 from collections import defaultdict
@@ -116,4 +116,4 @@ def main():
     print(f"   Contains: {[os.path.basename(f) for f in tsv_files]}")
 
 if __name__ == "__main__":
-    main()
+    main()'''
