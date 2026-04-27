@@ -65,12 +65,13 @@ def write_tsv(results_for_lang, output_path):
         for query_num, doc_ids in sorted_queries:
             top5 = doc_ids[:TOP_K]
 
-            # Pad with empty string if fewer than 5 results (safety net)
+            # Pad with 0 if fewer than 5 results (safety net — use int like the notebook)
             while len(top5) < TOP_K:
-                top5.append("")
+                top5.append("0")
 
-            # Format exactly as Python list string with single quotes
-            preds_str = "[" + ", ".join(f"'{d}'" for d in top5) + "]"
+            # Format as unquoted integers, matching the notebook's pandas/numpy output:
+            # [2764, 7487, 5334, 5968, 2627]  ← no quotes around the numbers
+            preds_str = "[" + ", ".join(d for d in top5) + "]"
             f.write(f"{query_num}\t{preds_str}\n")
 
     print(f"  Written {len(sorted_queries)} queries → {output_path}")
