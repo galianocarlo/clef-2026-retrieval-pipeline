@@ -105,8 +105,7 @@ class Searcher:
                 
                 # --- PREPARAZIONE QUERY LUCENE ---
                 if clean_text:
-                    clean_text_no_hyphens = clean_text.replace("-", "")
-                    escaped_title = QueryParserBase.escape(clean_text_no_hyphens)
+                    escaped_title = QueryParserBase.escape(clean_text)
                     title_query = QueryParserBase.parse(qp, escaped_title)
                     bq_builder.add(title_query, BooleanClause.Occur.SHOULD)
 

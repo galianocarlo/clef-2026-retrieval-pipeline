@@ -115,7 +115,6 @@ class Searcher:
                 # --- A. THE MAIN QUERY (The cleaned tweet) ---
                 clean_text = topic.get_search_query()
                 if clean_text:
-                    clean_text = clean_text.replace("-", "")
                     escaped_title = QueryParserBase.escape(clean_text)
                     title_query = QueryParserBase.parse(qp, escaped_title)
                     bq_builder.add(title_query, BooleanClause.Occur.SHOULD)

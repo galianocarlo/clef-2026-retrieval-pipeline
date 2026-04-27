@@ -123,18 +123,19 @@ class DirectoryIndexer:
                             title_field = f"{ParsedDocument.FIELDS.TITLE}_{lang}"
                             abstract_field = f"{ParsedDocument.FIELDS.ABSTRACT}_{lang}"
                             
-                            title_no_hyphens = pd.title.replace("-", "") if pd.title else ""
-                            abstract_no_hyphens = pd.abstract.replace("-", "") if pd.abstract else ""
+                            title_clean = pd.title if pd.title else ""
+                            abstract_clean = pd.abstract if pd.abstract else ""
 
-                            doc.add(Field(title_field, title_no_hyphens, BodyFieldType.TYPE))
-                            doc.add(Field(abstract_field, abstract_no_hyphens, BodyFieldType.TYPE))
-                            
+                            # 1. Lucene Indexing (BM25)
+                            doc.add(Field(title_field, title_clean, BodyFieldType.TYPE))
+                            doc.add(Field(abstract_field, abstract_clean, BodyFieldType.TYPE))
                             self.writer.addDocument(doc)
-                            
-                            full_text = f"{title_no_hyphens}. {abstract_no_hyphens}"
+
+                            # 2. Dense Indexing (FAISS)
+                            full_text = f"{title_clean}. {abstract_clean}"
                             self.text_batch.append(full_text)
                             self.id_batch.append(pd.id)
-                            
+
                             if len(self.text_batch) >= self.batch_size:
                                 self._process_faiss_batch()
 

@@ -136,12 +136,11 @@ class DirectoryIndexer:
                             title_field = f"{ParsedDocument.FIELDS.TITLE}_{lang}"
                             abstract_field = f"{ParsedDocument.FIELDS.ABSTRACT}_{lang}"
                             
-                            # Replace "-" with ""
-                            title_no_hyphens = pd.title.replace("-", "") if pd.title else ""
-                            abstract_no_hyphens = pd.abstract.replace("-", "") if pd.abstract else ""
+                            title_clean = pd.title if pd.title else ""
+                            abstract_clean = pd.abstract if pd.abstract else ""
 
-                            doc.add(Field(title_field, title_no_hyphens, BodyFieldType.TYPE))
-                            doc.add(Field(abstract_field, abstract_no_hyphens, BodyFieldType.TYPE))
+                            doc.add(Field(title_field, title_clean, BodyFieldType.TYPE))
+                            doc.add(Field(abstract_field, abstract_clean, BodyFieldType.TYPE))
                             
                             # Write to index
                             self.writer.addDocument(doc)

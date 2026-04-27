@@ -111,9 +111,6 @@ class Searcher:
                     # Stemming the queries
                     # stemmed_tokens = processor.process(clean_text, topic.language)
                     # stemmed_text = " ".join(stemmed_tokens)
-
-                    # Replace "-" with ""
-                    clean_text = clean_text.replace("-", "")
                     # Escape special characters so Lucene doesn't crash on weird math symbols
                     escaped_title = QueryParserBase.escape(clean_text)
                     title_query = QueryParserBase.parse(qp, escaped_title)
