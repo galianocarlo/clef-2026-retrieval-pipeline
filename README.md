@@ -42,7 +42,7 @@ All the contents of this repository are shared using the [Creative Commons Attri
 
 The `code` folder serves as starter for the participation at [CheckThat! 2026](https://checkthat.gitlab.io/clef2026/task1/) at [CLEF 2026](https://clef2026.clef-initiative.eu/).
 
-This section contains a multi-stage search pipeline for medical documents, evolving from a standard keyword-based search to a sophisticated neural-hybrid system.
+This section contains a multi-stage search pipeline for scientific papers from tweets:
 
 ### 1. `experiment/runs/` (Output Files)
 
@@ -78,3 +78,6 @@ This directory contains the results of different search configurations. Each fil
 * **`search.py`**: The primary search engine. It utilizes PyLucene and BM25 to perform asymmetric multilingual lexical searches.
 * **`search_prf.py`**: An evolution of the primary search engine. It implements a two-stage retrieval process using Pseudo-Relevance Feedback to expand queries.
 * **`rerank.py`**: The AI engine. It uses a HuggingFace multilingual Cross-Encoder to evaluate document semantics and re-rank candidate results.
+
+### 6. `pylucene/src/utils/` (Search Engines)
+* **`generate_submission.py`**: the script that convert our TRAC format into TSV format and it zips the solutions. 

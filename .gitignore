@@ -76,7 +76,7 @@ tomcat-logs/
 code/experiment/index/
 code/experiment/docs/
 code/experiment/corpus/
-
+code/experiment/submission/
 # Keep runs folder tracked but ignore its contents except .gitkeep
 code/experiment/runs/*
 !code/experiment/runs/.gitkeep
@@ -86,6 +86,10 @@ code/experiment/runs/*
 .vscode/
 
 # remove folders or file not necessary
-.code/pyserini/
-code\pylucene\src\hello-ir.py
 .env
+code/docker-compose.override.yml
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo

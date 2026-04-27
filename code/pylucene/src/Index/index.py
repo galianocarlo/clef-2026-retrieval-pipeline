@@ -210,7 +210,7 @@ if __name__ == "__main__":
             index_path=INDEX_PATH,
             docs_path=DOCS_PATH,
             extension=".jsonl",
-            expected_docs=34237,
+            expected_docs=10000,
             parser_class=JsonArrayDocumentParser # <--- Replace with your actual parser class name
         )
         
