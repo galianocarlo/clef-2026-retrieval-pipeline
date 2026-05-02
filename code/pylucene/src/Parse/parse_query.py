@@ -1,135 +1,149 @@
+import io
 import json
 import os 
 import re
+from abc import ABC, abstractmethod
+from collections import deque
 
-class ScientificClaimQuery:
-    """
-    Represents a scientific claim extracted from social media.
-    """
-    def __init__(self, query_id, text, language, pubkey, journal_list):
-        self.query_id = query_id
-        self.raw_text = text 
-        self.language = language
-        self.pubkey = pubkey
-        # We pass the loaded journal list into each query object
+class ParsedQuery:
+    """As the professor, a python data container representing a single query from the topics.
+     
+     Attribute: 
+        id: unique query identifier
+        Text: the string of the query
+        Language: language used in the query
+        pubkey: the single paper the query refers to"""
+    class FIELDS:
+        ID       = "query_id"
+        TEXT     = "text"
+        LANGUAGE = "language"
+        PUBKEY   = "pubkey"
+
+    def __init__(self, query_id, text: str, language: str,
+                 pubkey: str, journal_list: list):
+        self.query_id     = query_id
+        self.raw_text     = text
+        self.language     = language
+        self.pubkey       = pubkey
         self.journal_list = journal_list
 
-    def get_search_query(self):
+    def get_search_query(self) -> str:
         text = self.raw_text
-        
-        # 1. Standard cleaning (Mentions and URLs)
         text = re.sub(r'@\w+|http\S+', '', text)
         text = text.replace("#", "")
-
-        # 2. SMART FILTER: Keep letters (including German/French), numbers, 
-        # spaces, and basic punctuation. This automatically drops Emojis.
-        allowed_punctuation = ".,!?;-()/"
-        text = "".join(char for char in text if char.isalnum() or char.isspace() or char in allowed_punctuation)
-
-        # 3. Protective Thread Cleaning (Start of line only)
+        allowed = ".,!?;-()" # now keep the hyphen (and percentage % as in the paper(?))
+        text = "".join(c for c in text if c.isalnum() or c.isspace() or c in allowed)
         text = re.sub(r'^\d+[\)/]\s*', '', text)
-        
-        # 4. Final Polish
         return " ".join(text.split()).strip()
 
-    def extract_entities(self):
-        """
-        Checks the text against the journal list loaded from journals.txt.
-        """
-        # We look for each journal name from our list in the raw text
-        found = [j for j in self.journal_list if j in self.raw_text.lower()]
-        return found
+    def extract_entities(self) -> list:
+        return [
+            j for j in self.journal_list
+            if re.search(r'\b' + re.escape(j) + r'\b', self.raw_text.lower())
+        ]
 
     def __str__(self):
-        clean_text = self.get_search_query()
         entities = self.extract_entities()
         tag = f" [JOURNALS: {entities}]" if entities else ""
-        
-        return (f"--- Claim #{self.query_id} ({self.language.upper()}) ---"
+        return (f"--- Query #{self.query_id} ({self.language.upper()}) ---"
                 f"{tag}\n"
-                f"   CLEANED: {clean_text[:200]}...\n")
+                f"   CLEANED: {self.get_search_query()[:200]}...\n")
+    
 
-class ClaimParser:
-    # Now it takes TWO specific paths
-    def __init__(self, data_dir, journals_file):
-        self.data_dir = data_dir
-        # Pass the full path directly to the loader
-        self.journals = self.load_journals(journals_file)
+class QueryParser(ABC):
+    """As the professor, abstract base class for parser implementing the python iterator protocol.
+    
+    Subclasses must implement _parse() to define how a single query is read from the input stream"""
+    def __init__(self, in_reader: io.TextIOBase):
+        if in_reader is None:
+            raise ValueError("in_reader cannot be None.")
+        self._next = True
+        self._in   = in_reader
 
-    def load_journals(self, filepath):
-        """
-        Reads the journals.txt file using the exact filepath provided.
-        """
-        # We don't need os.path.join here because 'filepath' is already the exact GPS coordinate
-        if not os.path.exists(filepath):
-            print(f"!!! Warning: {filepath} not found. Entity extraction will be empty.")
-            return []
-        
-        with open(filepath, 'r', encoding='utf-8') as f:
-            return [line.strip().lower() for line in f if line.strip()]
+    def __iter__(self):
+        return self
 
-    def parse_language_file(self, filename, lang_code):
-        # We use the new variable name 'self.data_dir' here!
-        file_path = os.path.join(self.data_dir, filename)
-        
-        if not os.path.exists(file_path):
-            print(f"!!! Error: {file_path} not found.")
-            return
+    def __next__(self):
+        if not self._next:
+            raise StopIteration()
+        try:
+            return self._parse()
+        finally:
+            if not self._next:
+                try:
+                    self._in.close()
+                except IOError as e:
+                    raise RuntimeError() from e
 
-        with open(file_path, 'r', encoding='utf-8') as f:
-               
-                for line in f:
-                    if not line.strip(): continue # Skip blank lines
-                    try:
-                        entry = json.loads(line) # Notice the 's' in loads()
-                        if "index" in entry and "text" in entry:
-                            yield ScientificClaimQuery(
-                                query_id=entry["index"],
-                                text=entry["text"],
-                                language=lang_code,
-                                pubkey=entry.get("pubkey"),
-                                journal_list=self.journals 
-                            )
-                    except json.JSONDecodeError:
-                        print(f"!!! Error: {filename} contains invalid JSON.")
+    @abstractmethod
+    def _parse(self) -> ParsedQuery:
+        pass
 
 
-def load_journals(filepath):
-    """Reads the journals.txt file."""
-    if not os.path.exists(filepath): 
-        print(f"!!! Warning: {filepath} not found.")
-        return []
+class JsonArrayQueryParser(QueryParser):
+    """Parser for JSONL query files """
+
+    def __init__(self, in_reader: io.TextIOBase, lang_code: str, journal_list: list):
+        super().__init__(in_reader)
+        self.lang_code    = lang_code
+        self.journal_list = journal_list
+        self.batch_size   = 500
+        self.buffer       = deque()
+
+    def _parse(self) -> ParsedQuery:
+        if not self.buffer:
+            self._load_next_batch()
+        if not self.buffer:
+            self._next = False
+            raise StopIteration()
+        return self.buffer.popleft()
+
+    def _load_next_batch(self):
+        count = 0
+        while count < self.batch_size:
+            try:
+                line = next(self._in)
+            except StopIteration:
+                break
+            if not line.strip():
+                continue
+            try:
+                entry = json.loads(line)
+                if "index" in entry and "text" in entry:
+                    self.buffer.append(ParsedQuery(
+                        query_id     = entry["index"],
+                        text         = entry["text"],
+                        language     = self.lang_code,
+                        pubkey       = entry.get("pubkey"),
+                        journal_list = self.journal_list,
+                    ))
+                    count += 1
+            except json.JSONDecodeError:
+                print(f"Skipping invalid JSON line.")
+
+
+def load_journals(filepath: str) -> list:
+    """Load journal names from a plain-text file, one per line."""
+    if not os.path.exists(filepath):
+        raise FileNotFoundError(f"journals file not found: {filepath}")
     with open(filepath, 'r', encoding='utf-8') as f:
         return [line.strip().lower() for line in f if line.strip()]
 
-# --- EXECUTION ---
+
 if __name__ == "__main__":
-    # 1. Finds the exact folder this script is sitting in (.../pylucene/src/Parse)
-    SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-    
-    # 2. Points directly to the journals.txt sitting next to it
+    SCRIPT_DIR    = os.path.dirname(os.path.abspath(__file__))
     JOURNALS_PATH = os.path.join(SCRIPT_DIR, "journals.txt")
-    
-    # 3. Navigates UP three folders, then DOWN into experiment/docs
-    DATA_FOLDER = os.path.abspath(os.path.join(SCRIPT_DIR, "..", "..", "experiment", "docs"))
+    file_path     = "experiment/docs/en_train.jsonl"
+    lang          = 'en'
 
-    # 4. Gives the robot the exact GPS coordinates to both locations
-    parser = ClaimParser(data_dir=DATA_FOLDER, journals_file=JOURNALS_PATH)
-    
-    tasks = [
-        ("en_dev.jsonl", "en"),
-        ("de_dev.jsonl", "de"),
-        ("fr_dev.jsonl", "fr")
-    ]
-
-    all_claims = []
-
-    for file_name, lang in tasks:
-        print(f"\n>>> Loading {lang.upper()} collection...")
-        for claim in parser.parse_language_file(file_name, lang):
-            print(claim)
-            all_claims.append(claim)
-
-    print("-" * 50)
-    print(f"SUCCESS: {len(all_claims)} claims parsed. Journals loaded: {len(parser.journals)}")
-    print("-" * 50)
+    journals = load_journals(JOURNALS_PATH)  # ← load first
+    print(journals)
+    try:
+        with open(file_path, "r", encoding="utf-8") as f:
+            parser = JsonArrayQueryParser(f, lang, journals)  # ← pass list, not path
+            for i, doc in enumerate(parser):
+                print(f"------------------------------------\n{doc}")
+                if i == 10:
+                    break
+    except FileNotFoundError:
+        pass
