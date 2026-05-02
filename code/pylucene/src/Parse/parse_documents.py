@@ -34,10 +34,9 @@ class ParsedDocument:
 class DocumentParser(ABC):
     """As the professor, abstract base class for parser implementing the python iterator protocol.
     
-    Subclasses must implement _parse() to define how a single document is read from the input stream.
-    Attributes:
-        __init__: 
-        Doc: https://docs.python.org/3/tutorial/classes.html#iterators"""
+    Subclasses must implement _parse() to define how a single document is read from the input stream. 
+    Doc: 
+    - https://docs.python.org/3/tutorial/classes.html#iterators"""
 
     def __init__(self, in_reader: io.TextIOBase):
         if in_reader is None:
