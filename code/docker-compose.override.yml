@@ -16,15 +16,10 @@ services:
     tty: true
     env_file:
       - .env
-
-  pyserini:
-    build:
-      context: ./pyserini
-      dockerfile: Dockerfile
-    container_name: clef-pyserini
-    volumes:
-      - ./pyserini/src:/app/src
-      - ./experiment:/app/experiment
-    stdin_open: true
-    tty: true
-  
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]

@@ -33,6 +33,8 @@ from src.Parse.parse_query import ClaimParser
 # Initialize JVM for PyLucene
 assert lucene.getVMEnv() or lucene.initVM(), "Lucene version not available"
 
+import torch
+print(torch.cuda.is_available())
 
 class Searcher:
     def __init__(self, analyzer, similarity, index_path: str, run_id: str, run_path: str, max_docs_retrieved: int):
@@ -68,8 +70,8 @@ class Searcher:
             
         # 3. Initialize AI Models
         print("[INFO] Loading neural models (Embedding + Re-ranker)...")
-        self.dense_model = SentenceTransformer("sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2")
-        self.reranker = CrossEncoder("cross-encoder/mmarco-mMiniLMv2-L12-H384-v1", max_length=512)
+        self.dense_model = SentenceTransformer("sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2", device = 'cuda')
+        self.reranker = CrossEncoder("cross-encoder/mmarco-mMiniLMv2-L12-H384-v1", max_length=512, device = 'cuda')
         print("[INFO] Hybrid Engine Ready!\n")
 
     def _get_doc_text(self, doc_id, lang):
@@ -122,7 +124,6 @@ class Searcher:
                 # LO SWITCH ASIMMETRICO (IL "ROUTER")
                 # ====================================================
                 if lang == "en":
-                    # 🔥 PERCORSO VELOCE: SOLO BM25 (Inglese) 🔥
                     # Chiediamo direttamente a PyLucene solo i Top 5 definitivi
                     top_docs = self.searcher.search(final_query, self.max_docs) 
                     
@@ -147,7 +148,7 @@ class Searcher:
                         
                         
                 else:
-                    # 🧠 PERCORSO INTELLIGENTE: IBRIDO + NEURALE (Tedesco e Francese) 🧠
+                    # IBRIDO + NEURALE (Tedesco e Francese)
                     # Chiediamo a PyLucene 30 documenti da passare poi all'AI
                     top_docs = self.searcher.search(final_query, 30) 
                     lucene_ids = [stored_fields.document(sd.doc).get(ParsedDocument.FIELDS.ID) for sd in top_docs.scoreDocs]
@@ -156,7 +157,7 @@ class Searcher:
                     q_vec = self.dense_model.encode([clean_text], show_progress_bar=False)
                     q_vec = np.array(q_vec, dtype=np.float32)
                     faiss.normalize_L2(q_vec)
-                    _, indices = self.faiss_index.search(q_vec, 100) # Prende i Top 100
+                    _, indices = self.faiss_index.search(q_vec, 100) 
                     faiss_ids = [self.faiss_doc_ids[idx] for idx in indices[0] if idx < len(self.faiss_doc_ids)]
 
                     # --- C. FUSIONE E PREPARAZIONE ---
@@ -164,25 +165,47 @@ class Searcher:
                     pairs = []
                     valid_ids = []
                     
+                    chunk_size = 250 # how many words the model read simultaneously
+                    overlap = 50     # blocks overlapping avoiding bad-cutting sentences
+
                     for d_id in candidate_ids:
                         d_text = self._get_doc_text(d_id, lang)
-                        if d_text.strip():
+                        if not d_text.strip():
+                            continue
+                        
+                        words = d_text.strip().split()
+
+                        # if the document does not need a 'cut'
+                        if len(words) <= chunk_size:
                             pairs.append([clean_text, d_text])
                             valid_ids.append(d_id)
+                        else:
+                            # implementing chunking
+                            for i in range(0, len(words), chunk_size - overlap):
+                                chunk_words = words[i:i + chunk_size]
+                                chunk_text = " ".join(chunk_words)
+                                pairs.append([clean_text, chunk_text])
+                                valid_ids.append(d_id)
 
                     # --- D. NEURAL RE-RANKING ---
                     if pairs:
                         # L'AI valuta semanticamente i documenti di DE e FR
-                        scores = self.reranker.predict(pairs)
+                        scores = self.reranker.predict(pairs, batch_size = 64)
                         
+                        doc_max_scores = {}
+                        for doc_id, score in zip(valid_ids, scores):
+                            if doc_id not in doc_max_scores or score > doc_max_scores[doc_id]:
+                                doc_max_scores[doc_id] = float(score)
+
                         # Ordina dal punteggio più alto al più basso
-                        ranked_results = sorted(zip(valid_ids, scores), key=lambda x: x[1], reverse=True)
+                        ranked_results = sorted(doc_max_scores.items(), key=lambda x: x[1], reverse=True)
                         
                         # Salva i Top 5 nel file TREC
                         for rank, (doc_id, score) in enumerate(ranked_results[:self.max_docs]):
                             line = f"{lang.upper()}_{topic.query_id}\tQ0\t{doc_id}\t{rank}\t{score:.6f}\t{self.run_id}\n"
                             run_file.write(line)
-                # Small visual feedback so you don't worry while waiting
+
+                # Small visual feedback
                 if topics_count % 10 == 0:
                     print(f" -> {topics_count}/{expected_topics} queries completed...")
 
