@@ -93,3 +93,4 @@ code/docker-compose.override.yml
 __pycache__/
 *.pyc
 *.pyo
+code/notebooks/.ipynb_checkpoints/
