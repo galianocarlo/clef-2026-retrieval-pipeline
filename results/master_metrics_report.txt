@@ -2,25 +2,25 @@
    SEUPD 25/26 - GLOBAL RUN METRICS REPORT               
 =========================================================
 
-🏆 LEADERBOARD (Ordinata per MRR@5 Globale)
+🏆 LEADERBOARD (Sorted by MRR@5)
 -----------------------------------------------------------------------------------------------------------------------------
-| Pos | Run File                         | MRR@5   | P@1     | R@1000  | Descrizione
+| Pos | Run File                         | MRR@5   | MAP     | NDCG    | Description
 -----------------------------------------------------------------------------------------------------------------------------
-| 1   | run-hybrid-reranked.txt          | 0.4573  | 0.4058  | 0.5370   | V4 (Asymmetric Hybrid): Language-routed pipeline using pure lexical BM25 for English queries, and a Dense+Lexical Hybrid approach with Neural Re-ranking strictly for German and French.
-| 2   | run-hybrid-best.txt              | 0.4283  | 0.3835  | 0.7703   | V3 (Final): Hybrid pipeline combining BM25 lexical precision for English with neural re-ranking for DE and FR.
-| 3   | run-native-analyzers.txt         | 0.3984  | 0.3559  | 0.8185   | V1: Base asymmetric search using PyLucene, BM25, and native multilingual analyzers.
-| 4   | run-hybrid-best-prf.txt          | 0.3862  | 0.3212  | 0.7697   | V3 + PRF (Experimental): Hybrid pipeline built on the PRF expansion, combining BM25+PRF for English with Neural+PRF re-ranking for DE and FR.
-| 5   | run-native-analyzers-prf.txt     | 0.3583  | 0.2938  | 0.8207   | V2: BM25 enhanced with Pseudo-Relevance Feedback (PRF) for medical term expansion.
-| 6   | run-neural-reranked.txt          | 0.3107  | 0.2730  | 0.6810   | V1 + Neural: Semantic re-ranking of the V1 Top 100 using a HuggingFace Cross-Encoder.
-| 7   | run-neural-reranked-prf.txt      | 0.3065  | 0.2676  | 0.6721   | V2 + Neural: Semantic re-ranking applied to the PRF-expanded run.
+| 1   | run-hybrid-reranked.txt          | 0.3860  | 0.4602  | 0.4800   | V4 (Asymmetric Hybrid): Language-routed pipeline using pure lexical BM25 for English queries, and a Dense+Lexical Hybrid approach with Neural Re-ranking strictly for German and French.
+| 2   | run-hybrid-best.txt              | 0.2949  | 0.4394  | 0.4588   | V3 (Final): Hybrid pipeline combining BM25 lexical precision for English with neural re-ranking for DE and FR.
+| 3   | run-hybrid-best-prf.txt          | 0.2717  | 0.3974  | 0.4233   | V3 + PRF (Experimental): Hybrid pipeline built on the PRF expansion, combining BM25+PRF for English with Neural+PRF re-ranking for DE and FR.
+| 4   | run-neural-reranked.txt          | 0.2448  | 0.3268  | 0.3446   | V1 + Neural: Semantic re-ranking of the V1 Top 100 using a HuggingFace Cross-Encoder.
+| 5   | run-neural-reranked-prf.txt      | 0.2378  | 0.3220  | 0.3405   | V2 + Neural: Semantic re-ranking applied to the PRF-expanded run.
+| 6   | run-native-analyzers.txt         | 0.2174  | 0.4130  | 0.4323   | V1: Base asymmetric search using PyLucene, BM25, and native multilingual analyzers.
+| 7   | run-native-analyzers-prf.txt     | 0.1968  | 0.3707  | 0.3969   | V2: BM25 enhanced with Pseudo-Relevance Feedback (PRF) for medical term expansion.
 -----------------------------------------------------------------------------------------------------------------------------
 
-📄 DETTAGLI PER SINGOLA RUN (Ordinate dalla migliore alla peggiore)
+Single runs descriptions (sorted from best to worst)
 =========================================================
 
-🏆 Posizione in classifica: 1
-📁 RUN FILE: run-hybrid-reranked.txt
-📝 DESCRIPTION: V4 (Asymmetric Hybrid): Language-routed pipeline using pure lexical BM25 for English queries, and a Dense+Lexical Hybrid approach with Neural Re-ranking strictly for German and French.
+Rank position: 1
+RUN FILE: run-hybrid-reranked.txt
+DESCRIPTION: V4 (Asymmetric Hybrid): Language-routed pipeline using pure lexical BM25 for English queries, and a Dense+Lexical Hybrid approach with Neural Re-ranking strictly for German and French.
 ----------------------------------------
 === Starting Search Engine Evaluation ===
 
@@ -31,43 +31,43 @@ Computing metrics...
 =======================================
           OFFICIAL RESULTS             
 =======================================
- MRR@5     : 0.4573
- MAP       : 0.4573
- NDCG@10   : 0.4773
- PRECISION@1: 0.4058
- RECALL@1000: 0.5370
+ MRR@5  : 0.3860
+ MAP       : 0.4602
+ NDCG@10   : 0.4800
+ PRECISION@1: 0.4092
+ RECALL@1000: 0.5392
 =======================================
 
 =======================================
       RESULTS BY LANGUAGE              
 =======================================
 --- Language: EN ---
- MRR@5     : 0.4914
- MAP       : 0.4914
- NDCG@10   : 0.5112
- PRECISION@1: 0.4399
- RECALL@1000: 0.5700
+ MRR@5     : 0.4915
+ MAP       : 0.4915
+ NDCG@10   : 0.5114
+ PRECISION@1: 0.4402
+ RECALL@1000: 0.5706
 
 --- Language: DE ---
- MRR@5     : 0.2639
- MAP       : 0.2639
- NDCG@10   : 0.2827
- PRECISION@1: 0.2176
- RECALL@1000: 0.3394
+ MRR@5     : 0.2834
+ MAP       : 0.2834
+ NDCG@10   : 0.3039
+ PRECISION@1: 0.2332
+ RECALL@1000: 0.3653
 
 --- Language: FR ---
- MRR@5     : 0.3736
- MAP       : 0.3736
- NDCG@10   : 0.3956
- PRECISION@1: 0.3191
- RECALL@1000: 0.4615
+ MRR@5     : 0.3831
+ MAP       : 0.3831
+ NDCG@10   : 0.4025
+ PRECISION@1: 0.3333
+ RECALL@1000: 0.4601
 
 
 ************************************************************
 
-🏆 Posizione in classifica: 2
-📁 RUN FILE: run-hybrid-best.txt
-📝 DESCRIPTION: V3 (Final): Hybrid pipeline combining BM25 lexical precision for English with neural re-ranking for DE and FR.
+Rank position: 2
+RUN FILE: run-hybrid-best.txt
+DESCRIPTION: V3 (Final): Hybrid pipeline combining BM25 lexical precision for English with neural re-ranking for DE and FR.
 ----------------------------------------
 === Starting Search Engine Evaluation ===
 
@@ -78,7 +78,7 @@ Computing metrics...
 =======================================
           OFFICIAL RESULTS             
 =======================================
- MRR@5     : 0.4283
+ MRR@5  : 0.2949
  MAP       : 0.4394
  NDCG@10   : 0.4588
  PRECISION@1: 0.3835
@@ -112,9 +112,9 @@ Computing metrics...
 
 ************************************************************
 
-🏆 Posizione in classifica: 3
-📁 RUN FILE: run-native-analyzers.txt
-📝 DESCRIPTION: V1: Base asymmetric search using PyLucene, BM25, and native multilingual analyzers.
+Rank position: 3
+RUN FILE: run-hybrid-best-prf.txt
+DESCRIPTION: V3 + PRF (Experimental): Hybrid pipeline built on the PRF expansion, combining BM25+PRF for English with Neural+PRF re-ranking for DE and FR.
 ----------------------------------------
 === Starting Search Engine Evaluation ===
 
@@ -125,54 +125,7 @@ Computing metrics...
 =======================================
           OFFICIAL RESULTS             
 =======================================
- MRR@5     : 0.3984
- MAP       : 0.4109
- NDCG@10   : 0.4303
- PRECISION@1: 0.3559
- RECALL@1000: 0.8185
-=======================================
-
-=======================================
-      RESULTS BY LANGUAGE              
-=======================================
---- Language: EN ---
- MRR@5     : 0.4900
- MAP       : 0.5018
- NDCG@10   : 0.5238
- PRECISION@1: 0.4392
- RECALL@1000: 0.8758
-
---- Language: DE ---
- MRR@5     : 0.0953
- MAP       : 0.1090
- NDCG@10   : 0.1230
- PRECISION@1: 0.0777
- RECALL@1000: 0.4922
-
---- Language: FR ---
- MRR@5     : 0.0553
- MAP       : 0.0716
- NDCG@10   : 0.0792
- PRECISION@1: 0.0456
- RECALL@1000: 0.6795
-
-
-************************************************************
-
-🏆 Posizione in classifica: 4
-📁 RUN FILE: run-hybrid-best-prf.txt
-📝 DESCRIPTION: V3 + PRF (Experimental): Hybrid pipeline built on the PRF expansion, combining BM25+PRF for English with Neural+PRF re-ranking for DE and FR.
-----------------------------------------
-=== Starting Search Engine Evaluation ===
-
-Loading Qrels (Ground Truth)...
-Loading Run (Search Engine Results)...
-Computing metrics...
-
-=======================================
-          OFFICIAL RESULTS             
-=======================================
- MRR@5     : 0.3862
+ MRR@5  : 0.2717
  MAP       : 0.3974
  NDCG@10   : 0.4233
  PRECISION@1: 0.3212
@@ -206,9 +159,9 @@ Computing metrics...
 
 ************************************************************
 
-🏆 Posizione in classifica: 5
-📁 RUN FILE: run-native-analyzers-prf.txt
-📝 DESCRIPTION: V2: BM25 enhanced with Pseudo-Relevance Feedback (PRF) for medical term expansion.
+Rank position: 4
+RUN FILE: run-neural-reranked.txt
+DESCRIPTION: V1 + Neural: Semantic re-ranking of the V1 Top 100 using a HuggingFace Cross-Encoder.
 ----------------------------------------
 === Starting Search Engine Evaluation ===
 
@@ -219,54 +172,7 @@ Computing metrics...
 =======================================
           OFFICIAL RESULTS             
 =======================================
- MRR@5     : 0.3583
- MAP       : 0.3707
- NDCG@10   : 0.3969
- PRECISION@1: 0.2938
- RECALL@1000: 0.8207
-=======================================
-
-=======================================
-      RESULTS BY LANGUAGE              
-=======================================
---- Language: EN ---
- MRR@5     : 0.4386
- MAP       : 0.4507
- NDCG@10   : 0.4810
- PRECISION@1: 0.3624
- RECALL@1000: 0.8796
-
---- Language: DE ---
- MRR@5     : 0.0959
- MAP       : 0.1071
- NDCG@10   : 0.1218
- PRECISION@1: 0.0648
- RECALL@1000: 0.5078
-
---- Language: FR ---
- MRR@5     : 0.0560
- MAP       : 0.0708
- NDCG@10   : 0.0806
- PRECISION@1: 0.0385
- RECALL@1000: 0.6652
-
-
-************************************************************
-
-🏆 Posizione in classifica: 6
-📁 RUN FILE: run-neural-reranked.txt
-📝 DESCRIPTION: V1 + Neural: Semantic re-ranking of the V1 Top 100 using a HuggingFace Cross-Encoder.
-----------------------------------------
-=== Starting Search Engine Evaluation ===
-
-Loading Qrels (Ground Truth)...
-Loading Run (Search Engine Results)...
-Computing metrics...
-
-=======================================
-          OFFICIAL RESULTS             
-=======================================
- MRR@5     : 0.3107
+ MRR@5  : 0.2448
  MAP       : 0.3268
  NDCG@10   : 0.3446
  PRECISION@1: 0.2730
@@ -300,9 +206,9 @@ Computing metrics...
 
 ************************************************************
 
-🏆 Posizione in classifica: 7
-📁 RUN FILE: run-neural-reranked-prf.txt
-📝 DESCRIPTION: V2 + Neural: Semantic re-ranking applied to the PRF-expanded run.
+Rank position: 5
+RUN FILE: run-neural-reranked-prf.txt
+DESCRIPTION: V2 + Neural: Semantic re-ranking applied to the PRF-expanded run.
 ----------------------------------------
 === Starting Search Engine Evaluation ===
 
@@ -313,7 +219,7 @@ Computing metrics...
 =======================================
           OFFICIAL RESULTS             
 =======================================
- MRR@5     : 0.3065
+ MRR@5  : 0.2378
  MAP       : 0.3220
  NDCG@10   : 0.3405
  PRECISION@1: 0.2676
@@ -343,6 +249,100 @@ Computing metrics...
  NDCG@10   : 0.2400
  PRECISION@1: 0.1937
  RECALL@1000: 0.3903
+
+
+************************************************************
+
+Rank position: 6
+RUN FILE: run-native-analyzers.txt
+DESCRIPTION: V1: Base asymmetric search using PyLucene, BM25, and native multilingual analyzers.
+----------------------------------------
+=== Starting Search Engine Evaluation ===
+
+Loading Qrels (Ground Truth)...
+Loading Run (Search Engine Results)...
+Computing metrics...
+
+=======================================
+          OFFICIAL RESULTS             
+=======================================
+ MRR@5  : 0.2174
+ MAP       : 0.4130
+ NDCG@10   : 0.4323
+ PRECISION@1: 0.3561
+ RECALL@1000: 0.8191
+=======================================
+
+=======================================
+      RESULTS BY LANGUAGE              
+=======================================
+--- Language: EN ---
+ MRR@5     : 0.4914
+ MAP       : 0.5032
+ NDCG@10   : 0.5250
+ PRECISION@1: 0.4399
+ RECALL@1000: 0.8761
+
+--- Language: DE ---
+ MRR@5     : 0.0962
+ MAP       : 0.1094
+ NDCG@10   : 0.1240
+ PRECISION@1: 0.0751
+ RECALL@1000: 0.4948
+
+--- Language: FR ---
+ MRR@5     : 0.0646
+ MAP       : 0.0784
+ NDCG@10   : 0.0865
+ PRECISION@1: 0.0442
+ RECALL@1000: 0.6809
+
+
+************************************************************
+
+Rank position: 7
+RUN FILE: run-native-analyzers-prf.txt
+DESCRIPTION: V2: BM25 enhanced with Pseudo-Relevance Feedback (PRF) for medical term expansion.
+----------------------------------------
+=== Starting Search Engine Evaluation ===
+
+Loading Qrels (Ground Truth)...
+Loading Run (Search Engine Results)...
+Computing metrics...
+
+=======================================
+          OFFICIAL RESULTS             
+=======================================
+ MRR@5  : 0.1968
+ MAP       : 0.3707
+ NDCG@10   : 0.3969
+ PRECISION@1: 0.2938
+ RECALL@1000: 0.8207
+=======================================
+
+=======================================
+      RESULTS BY LANGUAGE              
+=======================================
+--- Language: EN ---
+ MRR@5     : 0.4386
+ MAP       : 0.4507
+ NDCG@10   : 0.4810
+ PRECISION@1: 0.3624
+ RECALL@1000: 0.8796
+
+--- Language: DE ---
+ MRR@5     : 0.0959
+ MAP       : 0.1071
+ NDCG@10   : 0.1218
+ PRECISION@1: 0.0648
+ RECALL@1000: 0.5078
+
+--- Language: FR ---
+ MRR@5     : 0.0560
+ MAP       : 0.0708
+ NDCG@10   : 0.0806
+ PRECISION@1: 0.0385
+ RECALL@1000: 0.6652
 
 
 ************************************************************

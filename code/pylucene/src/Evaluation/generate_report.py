@@ -22,8 +22,8 @@ def main():
     # Path navigation: Evaluation -> src -> pylucene -> code -> experiment -> runs
     RUNS_DIR = os.path.abspath(os.path.join(BASE_DIR, "..", "..", "experiment", "runs"))
     
-    # Path navigation: Evaluation -> src -> pylucene -> code -> root -> results
-    RESULTS_DIR = os.path.abspath(os.path.join(BASE_DIR, "..", "Results"))
+    # Path navigation: Evaluation -> src -> pylucene -> code -> root -> utils
+    RESULTS_DIR = os.path.abspath(os.path.join(BASE_DIR, "..", "utils"))
     
     EVAL_SCRIPT = os.path.join(BASE_DIR, "evaluate.py")
 
@@ -32,7 +32,7 @@ def main():
     
     report_output_path = os.path.join(RESULTS_DIR, "master_metrics_report.txt")
 
-    print(f"🔍 Scanning directory: {RUNS_DIR}")
+    print(f"Scanning directory: {RUNS_DIR}")
     
     # List that will contain the dictionaries with all the scores
     all_results = []
@@ -85,7 +85,6 @@ def main():
     
     all_results.sort(key=lambda x: x["mrr"], reverse=True)
 
-    print("\n📝 Stesura del report finale in corso...")
     with open(report_output_path, "w", encoding="utf-8") as report_file:
         
         # --- SEZIONE 1: LEADERBOARD ---
@@ -93,24 +92,24 @@ def main():
         report_file.write("   SEUPD 25/26 - GLOBAL RUN METRICS REPORT               \n")
         report_file.write("=========================================================\n\n")
         
-        report_file.write("🏆 LEADERBOARD (Ordinata per MRR@5 Globale)\n")
+        report_file.write("🏆 LEADERBOARD (Sorted by MRR@5)\n")
         report_file.write("-" * 125 + "\n")
-        report_file.write(f"| {'Pos':<3} | {'Run File':<32} | {'MRR@5':<7} | {'P@1':<7} | {'R@1000':<7} | {'Descrizione'}\n")
+        report_file.write(f"| {'Pos':<3} | {'Run File':<32} | {'MRR@5':<7} | {'MAP':<7} | {'NDCG':<7} | {'Description'}\n")
         report_file.write("-" * 125 + "\n")
         
         for i, res in enumerate(all_results, 1):
-            report_file.write(f"| {i:<3} | {res['filename']:<32} | {res['mrr']:.4f}  | {res['p1']:.4f}  | {res['r1000']:.4f}   | {res['description']}\n")
+            report_file.write(f"| {i:<3} | {res['filename']:<32} | {res['mrr']:.4f}  | {res['map']:.4f}  | {res['ndcg']:.4f}   | {res['description']}\n")
         
         report_file.write("-" * 125 + "\n\n")
         
         # --- SEZIONE 2: DETTAGLI DELLE RUN ---
-        report_file.write("📄 DETTAGLI PER SINGOLA RUN (Ordinate dalla migliore alla peggiore)\n")
+        report_file.write("Single runs descriptions (sorted from best to worst)\n")
         report_file.write("=========================================================\n\n")
         
         for i, res in enumerate(all_results, 1):
-            report_file.write(f"🏆 Posizione in classifica: {i}\n")
-            report_file.write(f"📁 RUN FILE: {res['filename']}\n")
-            report_file.write(f"📝 DESCRIPTION: {res['description']}\n")
+            report_file.write(f"Rank position: {i}\n")
+            report_file.write(f"RUN FILE: {res['filename']}\n")
+            report_file.write(f"DESCRIPTION: {res['description']}\n")
             report_file.write("-" * 40 + "\n")
             report_file.write(res['full_output'])
             report_file.write("\n" + ("*" * 60) + "\n\n")

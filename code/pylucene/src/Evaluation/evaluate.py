@@ -27,7 +27,7 @@ def main():
         run_path = sys.argv[1] 
     else:
         # Altrimenti usa quello di default (metti qui quello che avevi prima)
-        run_path = os.path.join(EXPERIMENT_DIR, "runs", "run-hybrid-best.txt")
+        run_path = os.path.join(EXPERIMENT_DIR, "runs", "run-hybrid-reranked.txt")
 
     # 2. VALIDATION CHECK
     if not os.path.exists(qrels_path):
@@ -59,13 +59,38 @@ def main():
     metrics = ["mrr@5", "map", "ndcg@10", "precision@1", "recall@1000"]
     results_dict = evaluate(qrels, run, metrics, make_comparable=True)
 
+    # Compute metrics by language
+    languages = ["EN", "DE", "FR"] 
+    qrels_dict = qrels.to_dict()
+    run_dict = run.to_dict()
+
+    lang_mrr_scores = []
+    lang_results_dict = {}
+
+    for lang in languages:
+        lang_qrels_dict = {q_id: data for q_id, data in qrels_dict.items() if lang in str(q_id).upper()}
+        lang_run_dict = {q_id: data for q_id, data in run_dict.items() if lang in str(q_id).upper()}
+
+        if lang_qrels_dict and lang_run_dict:
+            lang_qrels = Qrels(lang_qrels_dict)
+            lang_run = Run(lang_run_dict)
+            
+            lang_results = evaluate(lang_qrels, lang_run, metrics, make_comparable=True)
+            lang_results_dict[lang] = lang_results
+            lang_mrr_scores.append(lang_results["mrr@5"])
+
+    # Calculate Official CodaBench Macro-MRR (Average of the 3 languages MRR@5)
+    mrr_score = sum(lang_mrr_scores) / len(lang_mrr_scores) if lang_mrr_scores else 0.0
+
     # 5. DISPLAY OFFICIAL RESULTS
     print("=======================================")
     print("          OFFICIAL RESULTS             ")
     print("=======================================")
+    print(f" MRR@5  : {mrr_score:.4f}")
+
     for metric, score in results_dict.items():
-        # Print the score formatted to 4 decimal places
-        print(f" {metric.upper():<10}: {score:.4f}")
+        if metric.lower() != "mrr@5":
+             print(f" {metric.upper():<10}: {score:.4f}")
     print("=======================================\n")
 
 
