@@ -1,40 +1,44 @@
 import io
-import importlib
 from abc import ABC, abstractmethod
 import json
 import re
+from collections import deque
 from langdetect import detect, LangDetectException
-#from src.Parse.TextProcessor import TextProcessor
+from langdetect import DetectorFactory # this is because langdetec is not deterministic
 
-# TO DO
-# Update ParsedDocument.FIELDS to include ABSTRACT, AUTHOR, VENUE, and LANG.
-# Update the ParsedDocument.__init__ to accept those new fields.
-# Update the _load_next_batch method to extract those fields from the item dictionary and pass them to ParsedDocument().
-# 
+# To enforce consistent results
+DetectorFactory.seed = 0
 
 class ParsedDocument:
-    # Single Source of Truth
-    class FIELDS:
+    """ As the professor, a python data container representing a single document from the collection.
+     
+     Attribute: 
+        id: unique document identifier (mapped from the "pubkey" field)
+        Title: title of the paper used as the searchable text
+        Abstract: abstract used as the searchable text"""
+    class FIELDS:    
         ID = "id"
         TITLE = "title"
         ABSTRACT = "abstract"
-    # Simple data container representing a single document from the collection.
-    # - id   : unique document identifier (mapped from the "pubkey" field)
-    # - body : concatenation of title and abstract, used as the searchable text
+    
     def __init__(self, doc_id: str, title: str, abstract: str, lang_code: str = "en"):
         self.id = doc_id
         self.title = title
         self.abstract = abstract
         self.lang = lang_code
-        # we will divide body into each field (abstract, authours and more important lang (we could use it for improving the indexer and searcher))
 
     def __str__(self):
         # Truncates body for readable debug output
         return f"ID: {self.id}\nTitle: {self.title}\nAbstract : {self.abstract[:100]}...\n"
 
 class DocumentParser(ABC):
-    # Base parser class implementing the iterator protocol (__iter__ / __next__)
-    # so that any concrete subclass can be used directly in a for-loop.
+    """As the professor, abstract base class for parser implementing the python iterator protocol.
+    
+    Subclasses must implement _parse() to define how a single document is read from the input stream.
+    Attributes:
+        __init__: 
+        Doc: https://docs.python.org/3/tutorial/classes.html#iterators"""
+
     def __init__(self, in_reader: io.TextIOBase):
         if in_reader is None:
             raise ValueError()
@@ -57,35 +61,34 @@ class DocumentParser(ABC):
                     raise RuntimeError() from e
     @abstractmethod
     def _parse(self):
-        # Base implementation: subclasses must override this method
+        """Read and return the next document from the input stream"""
         pass
 
 class JsonArrayDocumentParser(DocumentParser):
-    # Parser for JSONL files (JSON Lines format: one JSON object per line).
-    
+    """
+    Parser for JSONL files (JSON Lines format: one JSON object per line).
+    """
     def __init__(self, in_reader: io.TextIOBase):
         super().__init__(in_reader)
-        #self.processor = TextProcessor()
         self.batch_size = 500  # number of lines we take
-        self.buffer = []
+        self.buffer = deque()
 
     def _parse(self) -> ParsedDocument:
-        # Se la scatola è vuota, carica i prossimi 500 documenti
+        # If buffer is empty, load next up to 500 docs
         if not self.buffer:
             self._load_next_batch()
             
-        # Se dopo aver provato a caricare la scatola è ancora vuota, il file è finito
+        # if the buffer is still empty, meaning the files is closed
         if not self.buffer:
             self._next = False
             raise StopIteration()
             
-        # Tira fuori un documento dalla scatola e dallo a Lucene
-        return self.buffer.pop(0)
+        # it returns a doc to pass it to Lucene
+        return self.buffer.popleft()
     
     def _load_next_batch(self):
         raw_docs = []
         
-        # 1. Legge le prossime 'batch_size' righe dal file JSONL
         for _ in range(self.batch_size):
             try:
                 line = next(self._in)
@@ -95,21 +98,17 @@ class JsonArrayDocumentParser(DocumentParser):
                     title = item.get("title", "")
                     abstract = item.get("abstract", "")
                     
-                    # Salviamo ID, titolo e contenuto
+                    # Collect the id, title and abstract in our list
                     raw_docs.append((doc_id, title, abstract))
             except StopIteration:
-                break # Abbiamo raggiunto la fine del file
+                break # end of the files
                 
         if not raw_docs:
             return
 
-        # Find out the language of every doc
-        docs_with_lang_title = []
-        docs_with_lang_abstract = []
-        
         for doc_id, title, abstract in raw_docs:
             try:
-                # detect() returns the language as 'en', 'fr', 'de', 'it'
+                # detect() returns the language as 'en', 'fr', 'de'
                 lang_code = detect(f"{title} {abstract}")
                 
                 # Force the english if it's not in the previous 3 languages
@@ -119,18 +118,8 @@ class JsonArrayDocumentParser(DocumentParser):
                 lang_code = 'other'
             
             self.buffer.append(ParsedDocument(doc_id, title, abstract, lang_code))
-            '''    
-            docs_with_lang_title.append((title, lang_code))
-            docs_with_lang_abstract.append((abstract, lang_code))
-        
-        # 3. Give to the processor list of tuples: [(testo1, 'en'), (testo2, 'fr'), ...]
-        processed_titles = list(self.processor.process_batch(docs_with_lang_title))
-        processed_abstracts = list(self.processor.process_batch(docs_with_lang_abstract))
-        
-        # 4. Rebuild all together
-        for (doc_id, _, _), (_, lang_code), proc_title, proc_abstract in zip(raw_docs, docs_with_lang_title, processed_titles, processed_abstracts):
-            self.buffer.append(ParsedDocument(doc_id, proc_title, proc_abstract, lang_code))
-        '''    
+
+
 # Quick test: prints the first 3 documents from the collection
 if __name__ == "__main__":
     file_path = "experiment/docs/collection.jsonl" 
