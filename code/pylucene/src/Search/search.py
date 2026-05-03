@@ -11,14 +11,12 @@ from org.apache.lucene.search import IndexSearcher, BooleanQuery, BooleanClause,
 from org.apache.lucene.queryparser.classic import QueryParser, QueryParserBase, MultiFieldQueryParser
 
 # Text Analysis and Scoring (Must match the Indexer exactly!)
-from org.apache.lucene.analysis.core import WhitespaceAnalyzer
 from org.apache.lucene.search.similarities import BM25Similarity
 
 # Import our custom parsers
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 from src.Parse.parse_documents import ParsedDocument
-#from src.Parse.parse_query import ScientificClaimQuery, load_journals
-from src.Parse.parse_query import ClaimParser
+from src.Parse.parse_query import JsonArrayQueryParser, load_journals
 
 # =============================
 # == IMPORTING NEW ANALYZERS ==
@@ -52,19 +50,8 @@ class Searcher:
         self.searcher.setSimilarity(similarity)
 
         self.analyzer = analyzer
-        # 2. Setup the Query Parser (Search in both TITLE and ABSTRACT)
-        #fields_to_search = [ParsedDocument.FIELDS.TITLE, ParsedDocument.FIELDS.ABSTRACT]
-        
-        # 2. Testing langdetect bugs that I (Carlo) swa in Luke
-        fields_to_search = [
-            "title_en", "abstract_en", 
-            "title_de", "abstract_de", 
-            "title_fr", "abstract_fr"
-        ]
-        # Implementing MultiFieldQueryParser
-        self.qp = MultiFieldQueryParser(fields_to_search, analyzer)
-        
-        # 3. Setup the Output File
+
+        # 2. Setup the Output File
         self.run_id = run_id
         self.max_docs = max_docs_retrieved
         
@@ -95,7 +82,6 @@ class Searcher:
                 # --- Building the Parser w.r.t. languages of the queries ---
                 # Testing langdetect bugs
                 lang = topic.language
-                #fields_to_search = [f"{ParsedDocument.FIELDS.TITLE}_{lang}", f"{ParsedDocument.FIELDS.ABSTRACT}_{lang}"]
                 if lang == "en":
                     # English + Other languages
                     fields_to_search = ["title_en", "abstract_en", "title_other", "abstract_other"]
@@ -120,14 +106,12 @@ class Searcher:
                     # SHOULD means "Match these words if possible"
                     bq_builder.add(title_query, BooleanClause.Occur.SHOULD)
 
-                # --- B. THE BOOST QUERY (The extracted journals) ---
+                # --- B. THE BOOST QUERY (The extracted journals)
                 journals_found = topic.extract_entities()
                 if journals_found:
-                    journals_text = " ".join(journals_found) # Tranform the list in a string
+                    journals_text = " ".join(journals_found)
                     escaped_desc = QueryParserBase.escape(journals_text)
-                    desc_query = QueryParserBase.parse(self.qp, escaped_desc)
-                    # Adding this as another SHOULD clause naturally boosts the BM25 score 
-                    # if the document contains the journal name!
+                    desc_query = QueryParserBase.parse(qp, escaped_desc)
                     bq_builder.add(desc_query, BooleanClause.Occur.SHOULD)
                 
                 # --- C. THE LANGUAGE FILTER (The CheckThat! requirement) ---
@@ -144,7 +128,7 @@ class Searcher:
                 score_docs = top_docs.scoreDocs
 
                 # --- E. WRITE TO TREC FORMAT ---
-                for rank, sd in enumerate(score_docs):
+                for rank, sd in enumerate(score_docs, start=1):
                     doc = stored_fields.document(sd.doc)
                     doc_id = doc.get(ParsedDocument.FIELDS.ID)
                     
@@ -170,74 +154,56 @@ if __name__ == "__main__":
     DATA_FOLDER = os.path.abspath(os.path.join(SCRIPT_DIR, "..", "..", "experiment", "docs"))
     JOURNALS_PATH = os.path.abspath(os.path.join(SCRIPT_DIR, "..", "Parse", "journals.txt"))
 
-    #analyzer = WhitespaceAnalyzer()
     similarity = BM25Similarity(0.9, 0.8)
-    # Initialize analyzers
+
+    # Per-field analyzers
     analyzer_map = HashMap()
-    
-    # English
-    analyzer_map.put(f"{ParsedDocument.FIELDS.TITLE}_en", EnglishAnalyzer())
-    analyzer_map.put(f"{ParsedDocument.FIELDS.ABSTRACT}_en", EnglishAnalyzer())
-    
-    # French
-    analyzer_map.put(f"{ParsedDocument.FIELDS.TITLE}_fr", FrenchAnalyzer())
-    analyzer_map.put(f"{ParsedDocument.FIELDS.ABSTRACT}_fr", FrenchAnalyzer())
-    
-    # German
-    analyzer_map.put(f"{ParsedDocument.FIELDS.TITLE}_de", GermanAnalyzer())
-    analyzer_map.put(f"{ParsedDocument.FIELDS.ABSTRACT}_de", GermanAnalyzer())
+
+    analyzer_map.put(f"{ParsedDocument.FIELDS.TITLE}_en",       EnglishAnalyzer())
+    analyzer_map.put(f"{ParsedDocument.FIELDS.ABSTRACT}_en",    EnglishAnalyzer())
+
+    analyzer_map.put(f"{ParsedDocument.FIELDS.TITLE}_fr",       FrenchAnalyzer())
+    analyzer_map.put(f"{ParsedDocument.FIELDS.ABSTRACT}_fr",    FrenchAnalyzer())
+
+    analyzer_map.put(f"{ParsedDocument.FIELDS.TITLE}_de",       GermanAnalyzer())
+    analyzer_map.put(f"{ParsedDocument.FIELDS.ABSTRACT}_de",    GermanAnalyzer())
+    # added
+    analyzer_map.put(f"{ParsedDocument.FIELDS.TITLE}_other",    StandardAnalyzer())
+    analyzer_map.put(f"{ParsedDocument.FIELDS.ABSTRACT}_other", StandardAnalyzer())
 
     multi_analyzer = PerFieldAnalyzerWrapper(StandardAnalyzer(), analyzer_map)
-    # Initialize the Searcher
+
     engine = Searcher(
         analyzer=multi_analyzer,
         similarity=similarity,
         index_path=INDEX_PATH,
         run_id="run-native-analyzers",
         run_path=RUNS_PATH,
-        max_docs_retrieved=1000  # TREC standard requires top 1000
+        max_docs_retrieved=1000  # standard: top 1000
     )
 
-    # Load Journals
-    #journals_list = ClaimParser.load_journals(filepath =JOURNALS_PATH)
-    # since there is an error I call it as it is an utility function
-    
-    #journals_list = load_journals(JOURNALS_PATH)
-    claim_parser = ClaimParser(data_dir=DATA_FOLDER, journals_file=JOURNALS_PATH)
-    
-    # Define the batches of queries to process
+    # Load journals for entity boosting
+    journals_list = load_journals(JOURNALS_PATH)
+
+    # Define the batches of queries to process (dev split)
     tasks = [
-        {"file": "en_dev.jsonl", "lang": "en", "expected": 195},
-        {"file": "de_dev.jsonl", "lang": "de", "expected": 100},
-        {"file": "fr_dev.jsonl", "lang": "fr", "expected": 100}
+        {"file": "en_train.jsonl", "lang": "en", "expected": 14977},
+        {"file": "de_train.jsonl", "lang": "de", "expected": 1460},
+        {"file": "fr_train.jsonl", "lang": "fr", "expected": 100},
     ]
 
-    '''try:
-        # loop through languages and search!
+    try:
         for task in tasks:
             file_path = os.path.join(DATA_FOLDER, task["file"])
             if not os.path.exists(file_path):
-                print(f"Skipping {task['file']} - file not found.")
+                print(f"Skipping {task['file']} — file not found.")
                 continue
-                
-            with open(file_path, 'r', encoding='utf-8') as f:
-                parser = ScientificClaimQuery(f, journals_list=journals_list, lang_code=task["lang"])
+
+            print(f"Processing: {task['file']}")
+            with open(file_path, "r", encoding="utf-8") as f:
+                parser = JsonArrayQueryParser(f, lang_code=task["lang"], journal_list=journals_list)
                 engine.search_topics(parser, task["expected"])
-                
-    finally:
-        engine.close()
-        print(f"\n#### All Searching Complete! Results saved to {RUNS_PATH} ####")'''
-    try:
-        # loop through languages and search!
-        for task in tasks:
-            print(f"Elaborazione del file: {task['file']}")
-            
-            # Usiamo ClaimParser per estrarre la lista delle query dal file
-            queries_iterator = claim_parser.parse_language_file(task["file"], task["lang"])
-            
-            # Passiamo l'iteratore pieno di query al motore di ricerca
-            engine.search_topics(queries_iterator, task["expected"])
-                
+
     finally:
         engine.close()
         print(f"\n#### All Searching Complete! Results saved to {RUNS_PATH} ####")
