@@ -4,6 +4,7 @@ import sys
 import time
 import re
 from collections import Counter
+from tqdm import tqdm
 from java.nio.file import Paths
 
 # Core Lucene search tools
@@ -13,13 +14,12 @@ from org.apache.lucene.search import IndexSearcher, BooleanQuery, BooleanClause,
 from org.apache.lucene.queryparser.classic import QueryParser, QueryParserBase, MultiFieldQueryParser
 
 # Text Analysis and Scoring (Must match the Indexer exactly!)
-from org.apache.lucene.analysis.core import WhitespaceAnalyzer
 from org.apache.lucene.search.similarities import BM25Similarity
 
 # Import our custom parsers
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 from src.Parse.parse_documents import ParsedDocument
-from src.Parse.parse_query import ClaimParser
+from src.Parse.parse_query import JsonArrayQueryParser, load_journals
 
 # =============================
 # == IMPORTING NEW ANALYZERS ==
@@ -66,17 +66,8 @@ class Searcher:
         self.searcher.setSimilarity(similarity)
 
         self.analyzer = analyzer
-        
-        # 2. Testing langdetect bugs that I (Carlo) swa in Luke
-        fields_to_search = [
-            "title_en", "abstract_en", 
-            "title_de", "abstract_de", 
-            "title_fr", "abstract_fr"
-        ]
-        # Implementing MultiFieldQueryParser
-        self.qp = MultiFieldQueryParser(fields_to_search, analyzer)
-        
-        # 3. Setup the Output File
+
+        # 2. Setup the Output File
         self.run_id = run_id
         self.max_docs = max_docs_retrieved
         
@@ -99,7 +90,7 @@ class Searcher:
 
         with open(self.run_file_path, 'a', encoding='utf-8') as run_file:
             
-            for topic in parser:
+            for topic in tqdm(parser, total=expected_topics, desc="Searching", unit="query"):
                 topics_count += 1
                 bq_builder = BooleanQuery.Builder()
 
@@ -121,11 +112,12 @@ class Searcher:
                     bq_builder.add(title_query, BooleanClause.Occur.SHOULD)
 
                 # --- B. THE BOOST QUERY (The extracted journals) ---
+                # Uses the per-query qp (was self.qp, which leaked across all 6 lang fields).
                 journals_found = topic.extract_entities()
                 if journals_found:
                     journals_text = " ".join(journals_found)
                     escaped_desc = QueryParserBase.escape(journals_text)
-                    desc_query = QueryParserBase.parse(self.qp, escaped_desc)
+                    desc_query = QueryParserBase.parse(qp, escaped_desc)
                     bq_builder.add(desc_query, BooleanClause.Occur.SHOULD)
                 
                 # Finalize the initial base query
@@ -192,10 +184,10 @@ class Searcher:
                 # =====================================================================
 
                 # --- E. WRITE TO TREC FORMAT ---
-                for rank, sd in enumerate(score_docs):
+                for rank, sd in enumerate(score_docs, start=1):
                     doc = stored_fields.document(sd.doc)
                     doc_id = doc.get(ParsedDocument.FIELDS.ID)
-                    
+
                     line = f"{topic.language.upper()}_{topic.query_id}\tQ0\t{doc_id}\t{rank}\t{sd.score:.6f}\t{self.run_id}\n"
                     run_file.write(line)
 
@@ -218,46 +210,56 @@ if __name__ == "__main__":
     JOURNALS_PATH = os.path.abspath(os.path.join(SCRIPT_DIR, "..", "Parse", "journals.txt"))
 
     similarity = BM25Similarity(0.9, 0.8)
-    # Initialize analyzers
+
+    # Per-field analyzers — must mirror index.py exactly
     analyzer_map = HashMap()
-    
-    # English
-    analyzer_map.put(f"{ParsedDocument.FIELDS.TITLE}_en", EnglishAnalyzer())
-    analyzer_map.put(f"{ParsedDocument.FIELDS.ABSTRACT}_en", EnglishAnalyzer())
-    
-    # French
-    analyzer_map.put(f"{ParsedDocument.FIELDS.TITLE}_fr", FrenchAnalyzer())
-    analyzer_map.put(f"{ParsedDocument.FIELDS.ABSTRACT}_fr", FrenchAnalyzer())
-    
-    # German
-    analyzer_map.put(f"{ParsedDocument.FIELDS.TITLE}_de", GermanAnalyzer())
-    analyzer_map.put(f"{ParsedDocument.FIELDS.ABSTRACT}_de", GermanAnalyzer())
+
+    analyzer_map.put(f"{ParsedDocument.FIELDS.TITLE}_en",       EnglishAnalyzer())
+    analyzer_map.put(f"{ParsedDocument.FIELDS.ABSTRACT}_en",    EnglishAnalyzer())
+
+    analyzer_map.put(f"{ParsedDocument.FIELDS.TITLE}_fr",       FrenchAnalyzer())
+    analyzer_map.put(f"{ParsedDocument.FIELDS.ABSTRACT}_fr",    FrenchAnalyzer())
+
+    analyzer_map.put(f"{ParsedDocument.FIELDS.TITLE}_de",       GermanAnalyzer())
+    analyzer_map.put(f"{ParsedDocument.FIELDS.ABSTRACT}_de",    GermanAnalyzer())
+
+    # _other fields (langdetect fallback) must match index.py
+    analyzer_map.put(f"{ParsedDocument.FIELDS.TITLE}_other",    StandardAnalyzer())
+    analyzer_map.put(f"{ParsedDocument.FIELDS.ABSTRACT}_other", StandardAnalyzer())
 
     multi_analyzer = PerFieldAnalyzerWrapper(StandardAnalyzer(), analyzer_map)
-    # Initialize the Searcher
+
     engine = Searcher(
         analyzer=multi_analyzer,
         similarity=similarity,
         index_path=INDEX_PATH,
-        run_id="run-native-analyzers-prf", # Updated run name
+        run_id="run-native-analyzers-prf",
         run_path=RUNS_PATH,
-        max_docs_retrieved=1000  
+        max_docs_retrieved=1000
     )
 
-    claim_parser = ClaimParser(data_dir=DATA_FOLDER, journals_file=JOURNALS_PATH)
-    
+    # Load journals for entity boosting
+    journals_list = load_journals(JOURNALS_PATH)
+
+    # Queries to process. Switch _train ↔ _dev to change split.
     tasks = [
         {"file": "en_dev.jsonl", "lang": "en", "expected": 195},
         {"file": "de_dev.jsonl", "lang": "de", "expected": 100},
-        {"file": "fr_dev.jsonl", "lang": "fr", "expected": 100}
+        {"file": "fr_dev.jsonl", "lang": "fr", "expected": 100},
     ]
 
     try:
         for task in tasks:
-            print(f"Elaborazione del file: {task['file']}")
-            queries_iterator = claim_parser.parse_language_file(task["file"], task["lang"])
-            engine.search_topics(queries_iterator, task["expected"])
-                
+            file_path = os.path.join(DATA_FOLDER, task["file"])
+            if not os.path.exists(file_path):
+                print(f"Skipping {task['file']} — file not found.")
+                continue
+
+            print(f"Processing: {task['file']}")
+            with open(file_path, "r", encoding="utf-8") as f:
+                parser = JsonArrayQueryParser(f, lang_code=task["lang"], journal_list=journals_list)
+                engine.search_topics(parser, task["expected"])
+
     finally:
         engine.close()
         print(f"\n#### All Searching Complete! Results saved to {RUNS_PATH} ####")

@@ -1,33 +1,76 @@
 import os
+import argparse
+from tqdm import tqdm
 from ranx import Qrels, Run, evaluate
-import sys
 # =============================================================================
 # SEARCH ENGINE EVALUATOR (TREC Format)
 # -----------------------------------------------------------------------------
 # This script evaluates the performance of the search engine by comparing
-# the retrieved results (Run) against the ground truth (Qrels) using 
+# the retrieved results (Run) against the ground truth (Qrels) using
 # standard Information Retrieval metrics (MAP, MRR, NDCG).
 # =============================================================================
+
+
+def _count_lines(path: str) -> int:
+    """Count non-empty lines so tqdm has a known total."""
+    with open(path, 'r', encoding='utf-8') as f:
+        return sum(1 for line in f if line.strip())
+
+
+def load_trec_run(path: str) -> Run:
+    """
+    TREC run loader with a tqdm progress bar.
+    File format: query_id  Q0  doc_id  rank  score  run_id   (whitespace-separated)
+    """
+    total = _count_lines(path)
+    run_dict: dict = {}
+    with open(path, 'r', encoding='utf-8') as f:
+        for line in tqdm(f, total=total, desc="Loading run", unit="line"):
+            parts = line.split()
+            if len(parts) < 6:
+                continue
+            q_id, _, doc_id, _, score, _ = parts[:6]
+            run_dict.setdefault(q_id, {})[doc_id] = float(score)
+    return Run(run_dict)
+
+
+def load_trec_qrels(path: str) -> Qrels:
+    """
+    TREC qrels loader with a tqdm progress bar.
+    File format: query_id  iter  doc_id  relevance   (whitespace-separated)
+    """
+    total = _count_lines(path)
+    qrels_dict: dict = {}
+    with open(path, 'r', encoding='utf-8') as f:
+        for line in tqdm(f, total=total, desc="Loading qrels", unit="line"):
+            parts = line.split()
+            if len(parts) < 4:
+                continue
+            q_id, _, doc_id, rel = parts[:4]
+            qrels_dict.setdefault(q_id, {})[doc_id] = int(rel)
+    return Qrels(qrels_dict)
 
 def main():
     print("=== Starting Search Engine Evaluation ===")
 
     # 1. DYNAMIC PATH RESOLUTION
-    # Get the directory where this script is located (.../code/pylucene/src/Evaluation)
     SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-    
-    # Navigate UP three levels to reach the 'code' folder, then DOWN to 'experiment'
     EXPERIMENT_DIR = os.path.abspath(os.path.join(SCRIPT_DIR, "..", "..", "experiment"))
 
-    # Define the exact paths for the Qrels (Ground Truth) and the Run (Our results)
-    # NOTE: You might need to adjust the exact filenames once you have them!
-    qrels_path = os.path.join(EXPERIMENT_DIR, "docs", "qrels_dev.txt") 
-    if len(sys.argv) > 1:
-        # Se riceve un file dal terminale, usa quello
-        run_path = sys.argv[1] 
-    else:
-        # Altrimenti usa quello di default (metti qui quello che avevi prima)
-        run_path = os.path.join(EXPERIMENT_DIR, "runs", "run-hybrid-best.txt")
+    # CLI:  python evaluate.py [run_file] [--split train|dev]
+    # Both args are optional; defaults are run-native-analyzers.txt + dev split.
+    parser = argparse.ArgumentParser()
+    parser.add_argument("run_file", nargs="?",
+                        default=os.path.join(EXPERIMENT_DIR, "runs", "run-native-analyzers.txt"),
+                        help="Path to the TREC run file produced by search.py")
+    parser.add_argument("--split", choices=["train", "dev"], default="dev",
+                        help="Which split's qrels to evaluate against (must match the split used by search.py)")
+    args = parser.parse_args()
+
+    qrels_path = os.path.join(EXPERIMENT_DIR, "docs", f"qrels_{args.split}.txt")
+    run_path = args.run_file
+    print(f"  qrels: {qrels_path}")
+    print(f"  run  : {run_path}")
 
     # 2. VALIDATION CHECK
     if not os.path.exists(qrels_path):
@@ -40,15 +83,12 @@ def main():
         print("    Please run the search.py script first to generate the results.")
         return
 
-    # 3. LOAD DATA INTO MEMORY
+    # 3. LOAD DATA INTO MEMORY (with tqdm progress bars; ranx's own from_file has no hook)
     print("\nLoading Qrels (Ground Truth)...")
-    # 'kind="trec"' specifies that the file follows the standard TREC format 
-    # (query_id, iteration, doc_id, relevance)
-    qrels = Qrels.from_file(qrels_path, kind="trec")
+    qrels = load_trec_qrels(qrels_path)
 
     print("Loading Run (Search Engine Results)...")
-    # (query_id, iteration, doc_id, rank, score, system_name)
-    run = Run.from_file(run_path, kind="trec")
+    run = load_trec_run(run_path)
 
     # 4. COMPUTE METRICS
     # We evaluate using the most common metrics for CLEF/TREC tasks:
@@ -82,25 +122,32 @@ def main():
     run_dict = run.to_dict()
 
     for lang in languages:
-        # Filtriamo le query: teniamo solo quelle in cui la sigla della lingua appare nel query_id
-        lang_qrels_dict = {q_id: data for q_id, data in qrels_dict.items() if lang in str(q_id).upper()}
-        lang_run_dict = {q_id: data for q_id, data in run_dict.items() if lang in str(q_id).upper()}
+        # Match the prefix the run/qrels writers actually use ("EN_", "DE_", "FR_").
+        prefix = f"{lang}_"
+        lang_qrels_dict = {q_id: data for q_id, data in qrels_dict.items()
+                           if str(q_id).upper().startswith(prefix)}
+        lang_run_dict = {q_id: data for q_id, data in run_dict.items()
+                         if str(q_id).upper().startswith(prefix)}
 
-        # Procediamo alla valutazione solo se ci sono effettivamente query per questa lingua
-        if lang_qrels_dict and lang_run_dict:
-            # Ricreiamo gli oggetti Qrels e Run specifici per la lingua
-            lang_qrels = Qrels(lang_qrels_dict)
-            lang_run = Run(lang_run_dict)
-            
-            lang_results = evaluate(lang_qrels, lang_run, metrics, make_comparable=True)
-            
+        # Only evaluate if BOTH sides have entries AND they share at least one query.
+        # Without this guard, ranx's Run() crashes with `max() arg is empty` when the
+        # filtered run dict has queries that aren't in qrels (or vice versa).
+        common = set(lang_qrels_dict).intersection(lang_run_dict)
+        if not common:
             print(f"--- Language: {lang} ---")
-            for metric, score in lang_results.items():
-                print(f" {metric.upper():<10}: {score:.4f}")
-            print() # Riga vuota per separare
-        else:
-            print(f"--- Language: {lang} ---")
-            print(" [!] Nessuna query trovata nel file di test per questa lingua.\n")
+            print(f" [!] No overlapping queries between run and qrels for {lang} "
+                  f"(qrels: {len(lang_qrels_dict)}, run: {len(lang_run_dict)}).\n")
+            continue
+
+        # Restrict both to the common set so ranx never sees an empty inner dict.
+        lang_qrels = Qrels({q: lang_qrels_dict[q] for q in common})
+        lang_run = Run({q: lang_run_dict[q] for q in common})
+
+        lang_results = evaluate(lang_qrels, lang_run, metrics, make_comparable=True)
+        print(f"--- Language: {lang} ({len(common)} queries) ---")
+        for metric, score in lang_results.items():
+            print(f" {metric.upper():<10}: {score:.4f}")
+        print()
 
 if __name__ == "__main__":
     main()

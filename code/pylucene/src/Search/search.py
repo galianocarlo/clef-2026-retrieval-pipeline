@@ -2,15 +2,16 @@ import lucene
 import os
 import sys
 import time
+from tqdm import tqdm
 from java.nio.file import Paths
 
 # Core Lucene search tools
 from org.apache.lucene.index import DirectoryReader, Term
 from org.apache.lucene.store import FSDirectory
 from org.apache.lucene.search import IndexSearcher, BooleanQuery, BooleanClause, TermQuery
-from org.apache.lucene.queryparser.classic import QueryParser, QueryParserBase, MultiFieldQueryParser
+from org.apache.lucene.queryparser.classic import QueryParserBase, MultiFieldQueryParser
 
-# Text Analysis and Scoring (Must match the Indexer exactly!)
+# Text Analysis and Scoring
 from org.apache.lucene.search.similarities import BM25Similarity
 
 # Import our custom parsers
@@ -18,17 +19,14 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspa
 from src.Parse.parse_documents import ParsedDocument
 from src.Parse.parse_query import JsonArrayQueryParser, load_journals
 
-# =============================
-# == IMPORTING NEW ANALYZERS ==
-# =============================
+# import analyzers
 from java.util import HashMap
 from org.apache.lucene.analysis.standard import StandardAnalyzer
 from org.apache.lucene.analysis.miscellaneous import PerFieldAnalyzerWrapper
 from org.apache.lucene.analysis.en import EnglishAnalyzer
 from org.apache.lucene.analysis.fr import FrenchAnalyzer
 from org.apache.lucene.analysis.de import GermanAnalyzer
-#from src.Parse.TextProcessor import TextProcessor
-#processor = TextProcessor()
+
 
 
 # Initialize PyLucene
@@ -74,8 +72,8 @@ class Searcher:
 
         # Open the run file in 'a' (append) mode so we can add EN, DE, and FR sequentially
         with open(self.run_file_path, 'a', encoding='utf-8') as run_file:
-            
-            for topic in parser:
+
+            for topic in tqdm(parser, total=expected_topics, desc="Searching", unit="query"):
                 topics_count += 1
                 bq_builder = BooleanQuery.Builder()
 
@@ -97,16 +95,13 @@ class Searcher:
                     # Stemming the queries
                     # stemmed_tokens = processor.process(clean_text, topic.language)
                     # stemmed_text = " ".join(stemmed_tokens)
-
-                    # Replace "-" with ""
-                    clean_text = clean_text.replace("-", "")
                     # Escape special characters so Lucene doesn't crash on weird math symbols
                     escaped_title = QueryParserBase.escape(clean_text)
                     title_query = QueryParserBase.parse(qp, escaped_title)
                     # SHOULD means "Match these words if possible"
                     bq_builder.add(title_query, BooleanClause.Occur.SHOULD)
 
-                # --- B. THE BOOST QUERY (The extracted journals)
+                # THE BOOST QUERY (The extracted journals)
                 journals_found = topic.extract_entities()
                 if journals_found:
                     journals_text = " ".join(journals_found)
@@ -189,7 +184,7 @@ if __name__ == "__main__":
     tasks = [
         {"file": "en_train.jsonl", "lang": "en", "expected": 14977},
         {"file": "de_train.jsonl", "lang": "de", "expected": 1460},
-        {"file": "fr_train.jsonl", "lang": "fr", "expected": 100},
+        {"file": "fr_train.jsonl", "lang": "fr", "expected": 2807},
     ]
 
     try:

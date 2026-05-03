@@ -34,6 +34,9 @@ class ParsedQuery:
         allowed = ".,!?;-()" # now keep the hyphen (and percentage % as in the paper(?))
         text = "".join(c for c in text if c.isalnum() or c.isspace() or c in allowed)
         text = re.sub(r'^\d+[\)/]\s*', '', text)
+        # Lucene treats uppercase AND / OR / NOT as boolean operators; lowercase them
+        # so a tweet starting with "AND THIS HAPPENED..." doesn't crash the parser.
+        text = re.sub(r'\b(AND|OR|NOT)\b', lambda m: m.group().lower(), text)
         return " ".join(text.split()).strip()
 
     def extract_entities(self) -> list:

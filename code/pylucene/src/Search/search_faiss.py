@@ -5,6 +5,7 @@ import time
 import json
 import faiss
 import numpy as np
+from tqdm import tqdm
 from java.nio.file import Paths
 
 # Lucene Imports
@@ -28,10 +29,23 @@ from sentence_transformers import SentenceTransformer, CrossEncoder
 # Custom Imports (Ensure paths are correct for your project)
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 from src.Parse.parse_documents import ParsedDocument
-from src.Parse.parse_query import ClaimParser
+from src.Parse.parse_query import JsonArrayQueryParser, load_journals
 
 # Initialize JVM for PyLucene
 assert lucene.getVMEnv() or lucene.initVM(), "Lucene version not available"
+
+# ─────────────────────────────────────────────────────────────────────────
+# Neural model selection.
+# Defaults are CPU-friendly (~1 GB RAM total). On a GPU machine, swap to:
+#   EMBEDDING_MODEL = "BAAI/bge-m3"                 # 568M, 1024d, 8k context
+#   RERANKER_MODEL  = "BAAI/bge-reranker-v2-m3"     # 568M, 1024 token max
+# These are retrieval-tuned (the defaults are paraphrase-/mMARCO-tuned, which
+# is the wrong objective for scientific-claim retrieval — see audit notes).
+# Must match the model used by index_faiss.py for the embedding side.
+# ─────────────────────────────────────────────────────────────────────────
+EMBEDDING_MODEL  = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
+RERANKER_MODEL   = "cross-encoder/mmarco-mMiniLMv2-L12-H384-v1"
+RERANKER_MAXLEN  = 512   # bge-reranker-v2-m3 supports 1024+
 
 
 class Searcher:
@@ -44,32 +58,26 @@ class Searcher:
         self.searcher.setSimilarity(similarity)
         self.analyzer = analyzer
 
-        fields_to_search = [
-            "title_en", "abstract_en", 
-            "title_de", "abstract_de", 
-            "title_fr", "abstract_fr"
-        ]
-        self.qp = MultiFieldQueryParser(fields_to_search, analyzer)
-
         self.run_id = run_id
         self.max_docs = max_docs_retrieved
-        
+
         # Prepare the output file
         os.makedirs(run_path, exist_ok=True)
         self.run_file_path = os.path.join(run_path, f"{run_id}.txt")
         with open(self.run_file_path, 'w', encoding='utf-8') as f:
-            pass 
+            pass
 
         # 2. Initialize FAISS (Vectors)
         print("[INFO] Loading FAISS vector database...")
         self.faiss_index = faiss.read_index(os.path.join(index_path, "corpus.faiss"))
         with open(os.path.join(index_path, "doc_ids.json"), 'r', encoding='utf-8') as f:
             self.faiss_doc_ids = json.load(f)
-            
+
         # 3. Initialize AI Models
-        print("[INFO] Loading neural models (Embedding + Re-ranker)...")
-        self.dense_model = SentenceTransformer("sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2")
-        self.reranker = CrossEncoder("cross-encoder/mmarco-mMiniLMv2-L12-H384-v1", max_length=512)
+        print(f"[INFO] Loading dense encoder: {EMBEDDING_MODEL}")
+        self.dense_model = SentenceTransformer(EMBEDDING_MODEL)
+        print(f"[INFO] Loading cross-encoder: {RERANKER_MODEL}")
+        self.reranker = CrossEncoder(RERANKER_MODEL, max_length=RERANKER_MAXLEN)
         print("[INFO] Hybrid Engine Ready!\n")
 
     def _get_doc_text(self, doc_id, lang):
@@ -90,7 +98,7 @@ class Searcher:
         stored_fields = self.searcher.storedFields()
 
         with open(self.run_file_path, 'a', encoding='utf-8') as run_file:
-            for topic in parser:
+            for topic in tqdm(parser, total=expected_topics, desc="Searching", unit="query"):
                 topics_count += 1
                 bq_builder = BooleanQuery.Builder()
                 lang = topic.language
@@ -102,19 +110,19 @@ class Searcher:
 
                 qp = MultiFieldQueryParser(fields_to_search, self.analyzer)
                 clean_text = topic.get_search_query()
-                
-                # --- PREPARAZIONE QUERY LUCENE ---
+
+                # --- LUCENE QUERY (no manual hyphen stripping; analyzer handles it) ---
                 if clean_text:
-                    clean_text_no_hyphens = clean_text.replace("-", "")
-                    escaped_title = QueryParserBase.escape(clean_text_no_hyphens)
+                    escaped_title = QueryParserBase.escape(clean_text)
                     title_query = QueryParserBase.parse(qp, escaped_title)
                     bq_builder.add(title_query, BooleanClause.Occur.SHOULD)
 
+                # Journal boost (Bug fix: was self.qp → cross-language leakage).
                 journals_found = topic.extract_entities()
                 if journals_found:
                     journals_text = " ".join(journals_found)
                     escaped_desc = QueryParserBase.escape(journals_text)
-                    desc_query = QueryParserBase.parse(self.qp, escaped_desc)
+                    desc_query = QueryParserBase.parse(qp, escaped_desc)
                     bq_builder.add(desc_query, BooleanClause.Occur.SHOULD)
 
                 final_query = bq_builder.build()
@@ -123,11 +131,12 @@ class Searcher:
                 # LO SWITCH ASIMMETRICO (IL "ROUTER")
                 # ====================================================
                 if lang == "en":
-                    # 🔥 PERCORSO VELOCE: SOLO BM25 (Inglese) 🔥
-                    # Chiediamo direttamente a PyLucene solo i Top 5 definitivi
-                    top_docs = self.searcher.search(final_query, self.max_docs) 
-                    
-                    for rank, sd in enumerate(top_docs.scoreDocs):
+                    # Fast path: pure BM25 for English (kept here because the default
+                    # MiniLM cross-encoder regresses on English; revisit when swapping
+                    # to bge-reranker-v2-m3, where the uniform pipeline becomes safe).
+                    top_docs = self.searcher.search(final_query, self.max_docs)
+
+                    for rank, sd in enumerate(top_docs.scoreDocs, start=1):
                         doc_id = stored_fields.document(sd.doc).get(ParsedDocument.FIELDS.ID)
                         score = sd.score
                         # Scriviamo direttamente nel file TREC usando lo score di BM25
@@ -166,13 +175,10 @@ class Searcher:
                         # Ordina dal punteggio più alto al più basso
                         ranked_results = sorted(zip(valid_ids, scores), key=lambda x: x[1], reverse=True)
                         
-                        # Salva i Top 5 nel file TREC
-                        for rank, (doc_id, score) in enumerate(ranked_results[:self.max_docs]):
+                        # Save up to max_docs reranked results
+                        for rank, (doc_id, score) in enumerate(ranked_results[:self.max_docs], start=1):
                             line = f"{lang.upper()}_{topic.query_id}\tQ0\t{doc_id}\t{rank}\t{score:.6f}\t{self.run_id}\n"
                             run_file.write(line)
-                # Small visual feedback so you don't worry while waiting
-                if topics_count % 10 == 0:
-                    print(f" -> {topics_count}/{expected_topics} queries completed...")
 
         elapsed = int(time.time() - start_time)
         print(f"Batch completed in {elapsed} seconds.\n")
@@ -189,44 +195,53 @@ if __name__ == "__main__":
     DATA_FOLDER = os.path.abspath(os.path.join(SCRIPT_DIR, "..", "..", "experiment", "docs"))
     JOURNALS_PATH = os.path.abspath(os.path.join(SCRIPT_DIR, "..", "Parse", "journals.txt"))
 
-    # 2. Lucene Analyzer Configuration
+    # 2. Lucene Analyzer Configuration — must mirror index.py / index_faiss.py
     similarity = BM25Similarity(0.9, 0.8)
     analyzer_map = HashMap()
-    
-    analyzer_map.put(f"{ParsedDocument.FIELDS.TITLE}_en", EnglishAnalyzer())
-    analyzer_map.put(f"{ParsedDocument.FIELDS.ABSTRACT}_en", EnglishAnalyzer())
-    analyzer_map.put(f"{ParsedDocument.FIELDS.TITLE}_fr", FrenchAnalyzer())
-    analyzer_map.put(f"{ParsedDocument.FIELDS.ABSTRACT}_fr", FrenchAnalyzer())
-    analyzer_map.put(f"{ParsedDocument.FIELDS.TITLE}_de", GermanAnalyzer())
-    analyzer_map.put(f"{ParsedDocument.FIELDS.ABSTRACT}_de", GermanAnalyzer())
+
+    analyzer_map.put(f"{ParsedDocument.FIELDS.TITLE}_en",       EnglishAnalyzer())
+    analyzer_map.put(f"{ParsedDocument.FIELDS.ABSTRACT}_en",    EnglishAnalyzer())
+    analyzer_map.put(f"{ParsedDocument.FIELDS.TITLE}_fr",       FrenchAnalyzer())
+    analyzer_map.put(f"{ParsedDocument.FIELDS.ABSTRACT}_fr",    FrenchAnalyzer())
+    analyzer_map.put(f"{ParsedDocument.FIELDS.TITLE}_de",       GermanAnalyzer())
+    analyzer_map.put(f"{ParsedDocument.FIELDS.ABSTRACT}_de",    GermanAnalyzer())
+    analyzer_map.put(f"{ParsedDocument.FIELDS.TITLE}_other",    StandardAnalyzer())
+    analyzer_map.put(f"{ParsedDocument.FIELDS.ABSTRACT}_other", StandardAnalyzer())
 
     multi_analyzer = PerFieldAnalyzerWrapper(StandardAnalyzer(), analyzer_map)
 
     # 3. Engine Initialization
+    # max_docs_retrieved=1000 is the TREC standard: needed for R@1000, MAP, NDCG.
+    # The previous value (5) silently invalidated every metric except P@1.
     engine = Searcher(
         analyzer=multi_analyzer,
         similarity=similarity,
         index_path=INDEX_PATH,
         run_id="run-hybrid-reranked",
         run_path=RUNS_PATH,
-        max_docs_retrieved=5 # CheckThat! final task usually evaluates @5
+        max_docs_retrieved=1000,
     )
 
-    claim_parser = ClaimParser(data_dir=DATA_FOLDER, journals_file=JOURNALS_PATH)
-    
-    # 4. TASK DEFINITION (Validation Set Only)
+    journals_list = load_journals(JOURNALS_PATH)
+
+    # 4. Tasks (dev split: 195/100/100 — swap _dev → _train to evaluate on train).
     tasks = [
-        {"file": "en_dev.jsonl", "lang": "en", "expected": 3905},
-        {"file": "de_dev.jsonl", "lang": "de", "expected": 386},
-        {"file": "fr_dev.jsonl", "lang": "fr", "expected": 702}
+        {"file": "en_dev.jsonl", "lang": "en", "expected": 195},
+        {"file": "de_dev.jsonl", "lang": "de", "expected": 100},
+        {"file": "fr_dev.jsonl", "lang": "fr", "expected": 100},
     ]
 
     try:
-        # Execution
         for task in tasks:
-            print(f"Processing file: {task['file']}")
-            queries_iterator = claim_parser.parse_language_file(task["file"], task["lang"])
-            engine.search_topics(queries_iterator, task["expected"])
+            file_path = os.path.join(DATA_FOLDER, task["file"])
+            if not os.path.exists(file_path):
+                print(f"Skipping {task['file']} — file not found.")
+                continue
+
+            print(f"Processing: {task['file']}")
+            with open(file_path, "r", encoding="utf-8") as f:
+                parser = JsonArrayQueryParser(f, lang_code=task["lang"], journal_list=journals_list)
+                engine.search_topics(parser, task["expected"])
     finally:
         engine.close()
         print(f"#### Hybrid Search Completed! Results saved in: {RUNS_PATH}/run-hybrid-reranked.txt ####")
