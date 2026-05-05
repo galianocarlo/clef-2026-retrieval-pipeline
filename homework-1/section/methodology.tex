@@ -1,4 +1,37 @@
 \section{Methodology}
 \label{sec:methodology}
 
-Describe the methodology you have adopted, the architecture of your system, your workflow, etc.
+\subsection{V1: Lexical Baseline and Probabilistic Retrieval}
+\label{subsec:methodology_v1}
+Our foundational pipeline (V1) relied exclusively on exact keyword matching via Apache Lucene, utilizing the BM25 probabilistic scoring model. 
+\begin{itemize}
+    \item \textbf{Theoretical Foundation:} BM25 improves upon standard TF-IDF by introducing term frequency saturation and document length normalization. Given the dense nature of scientific and medical abstracts, we calibrated the parameters to $k_1=0.9$ and $b=0.8$. This calibration strictly limits the relevance of repeated acronyms, preventing long documents from being penalized while avoiding term saturation.
+    \item \textbf{Multilingual Indexing:} To preserve complex medical terminology and hyphenated compounds, we indexed documents using native language-specific analyzers (e.g., \texttt{EnglishAnalyzer}, \texttt{FrenchAnalyzer}, \texttt{GermanAnalyzer}) rather than generic NLP tokenizers. 
+    \item \textbf{The Bottleneck:} While this approach performs exceptionally well for English queries, where the vocabulary is standardized, it suffers from an important vocabulary mismatch for cross-lingual tasks (that includes French and German). The main issue of Lexical models is that they fail when query terms lack exact character-level translations in the target documents.
+\end{itemize}
+
+\subsection{V2: Statistical Query Expansion via Pseudo-Relevance Feedback}
+\label{subsec:methodology_v2}
+To bridge the vocabulary gap without introducing external neural models, our second iteration (V2) explored a statistical expansion technique known as Pseudo-Relevance Feedback (PRF).
+\begin{itemize}
+    \item \textbf{Mechanism:} PRF assumes that the initial top-$k$ retrieved documents are highly relevant. The system retrieved the top 3 documents, merged their multilingual text fields, and returned the 5 most frequent terms, applying stopword removal techniques with its multilingual stopwords list. These terms were then appended to the original query as a \texttt{SHOULD} clause to proactively expand the search vocabulary.
+    \item \textbf{Theoretical Limitation (Topic Drift):} While the concept behind this theory seemed very promising, empirical observation showed high susceptibility to topic drift. when the initial retrieval was marginally inaccurate, the statistically extracted terms shifted the semantic focus away from what the user had been looking for. Due to the high precision required in the medical domain, this purely statistical expansion proved to be unsuitable.
+\end{itemize}
+
+\subsection{V3: Asymmetric Search and Semantic Re-ranking}
+\label{subsec:methodology_v3}
+Once understood the performances of the statistical expansion, with V3 we introduced Deep Learning to understand the semantic intent behind the queries. We adopted an asymmetric architecture: English queries were routed through the fast BM25 pipeline, while French and German queries went through a two-stage retrieve-and-rerank process.
+\begin{itemize}
+    \item \textbf{Semantic Scoring:} Our experiment used a Transformer-based Cross-Encoder (\texttt{cross-encoder/mmarco-mMiniLMv2-L12-H384-v1}). Unlike Bi-Encoders, Cross-Encoders perform full self-attention across both the concatenated query and document, allowing the deep, word-level semantic interactions of importance in cross-lingual understanding.
+    \item \textbf{Max-P Chunking Strategy:} A key theoretical constraint of Transformers is that they have a fixed-length context window (512 tokens for our selected model), which causes information loss as not all of the relevant information contained in the medical papers is considered. To bypass this, we implemented a Max-P (Max-Passage) sliding-window strategy, where documents were partitioned into independent chunks of 250 words, with a 50-word overlap to preserve semantics. The final relevance score for the document would be based on the highest-scoring chunk.
+    \item \textbf{The Retrieval Bottleneck:} Although the Cross-Encoder performs well at re-ordering candidate documents, it was limited by BM25's initial retrieval suitability. If the lexical engine failed to retrieve a relevant cross-lingual document (based upon vocabulary mismatch), the neural re-ranker was unable to evaluate it.
+\end{itemize}
+
+\subsection{V4: Fully Asymmetric Hybrid Retrieval with Dense Vectors}
+\label{subsec:methodology_v4}
+To resolve the retrieval bottleneck identified in V3, our final architecture (V4) fully embraced Dense Retrieval, constructing a Hybrid candidate pool prior to the re-ranking phase.
+\begin{itemize}
+    \item \textbf{Vector Space Projection:} To project queries and documents into a shared continuous vector space, we have integrated FAISS (Facebook AI Similarity Search) to avoid exact-match limitations. The corpus was encoded using the \texttt{intfloat/multilingual-e5-base} model.
+    \item \textbf{Hybrid Candidate Pooling:} To create the starting candidate pool for French and German queries, the first step was to take the exact-keyword precision candidates from Lucene and the contextual candidates from FAISS. This dual-pool strategy maximized the initial Recall, ensuring relevant documents bypassed language barriers prior to being re-ranked by the Cross-Encoder.
+    \item \textbf{Score Normalization and Tail Padding:} Combining two different types of scoring, BM25 and Cross-Encoder logits, presents an architectural challenge due to the large difference in their scoring ranges. To solve this issue, a unified ranking that preserves theoretical Recall@1000 without corrupting top-$k$ Precision, was accomplished using a tail-padding strategy. Documents retrieved by the neural re-ranker populated the top ranks, while the remaining unranked candidates retrieved by BM25 were appended to the tail with a discounted scores (computed as $-1000.0 - rank$). This mathematically prevents evaluation frameworks from erroneously resorting the list, preserving the integrity of both the deep semantic precision at the top and the broad lexical recall at the bottom of the ranking.
+\end{itemize}
