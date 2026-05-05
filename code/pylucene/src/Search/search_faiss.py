@@ -5,6 +5,7 @@ import time
 import json
 import faiss
 import numpy as np
+import torch
 from tqdm import tqdm
 from java.nio.file import Paths
 
@@ -23,162 +24,285 @@ from org.apache.lucene.analysis.en import EnglishAnalyzer
 from org.apache.lucene.analysis.fr import FrenchAnalyzer
 from org.apache.lucene.analysis.de import GermanAnalyzer
 
-# Neural Models (AI)
+# Neural Models
 from sentence_transformers import SentenceTransformer, CrossEncoder
 
-# Custom Imports (Ensure paths are correct for your project)
+# Custom Imports
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 from src.Parse.parse_documents import ParsedDocument
 from src.Parse.parse_query import JsonArrayQueryParser, load_journals
 
-# Initialize JVM for PyLucene
+# Initialize JVM
 assert lucene.getVMEnv() or lucene.initVM(), "Lucene version not available"
 
 # ─────────────────────────────────────────────────────────────────────────
-# Neural model selection.
-# Defaults are CPU-friendly (~1 GB RAM total). On a GPU machine, swap to:
-#   EMBEDDING_MODEL = "BAAI/bge-m3"                 # 568M, 1024d, 8k context
-#   RERANKER_MODEL  = "BAAI/bge-reranker-v2-m3"     # 568M, 1024 token max
-# These are retrieval-tuned (the defaults are paraphrase-/mMARCO-tuned, which
-# is the wrong objective for scientific-claim retrieval — see audit notes).
-# Must match the model used by index_faiss.py for the embedding side.
+# Model constants — must match index_faiss.py exactly for the embedding side.
+#
+#   EMBEDDING_MODEL : encodes queries for FAISS lookup.
+#   RERANKER_MODEL  : cross-encoder that re-scores the merged candidate pool.
+#   RERANKER_MAXLEN : token budget per pair (bge-reranker-v2-m3 supports 1024).
+#   RERANKER_BATCH  : pairs per GPU call.  At 568M FP16: 32 pairs ≈ 2 GB VRAM.
+#
+#   BM25_RECALL     : BM25 retrieves this many docs per query for the TAIL
+#                     (positions beyond RERANK_POOL_SIZE are kept in BM25 order
+#                     so every query emits exactly max_docs results → R@1000 intact).
+#   BM25_TOP        : top-N from BM25 to include in the candidate pool.
+#   FAISS_TOP       : top-N from FAISS to include in the candidate pool.
 # ─────────────────────────────────────────────────────────────────────────
-EMBEDDING_MODEL  = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
+#EMBEDDING_MODEL  = "BAAI/bge-m3"
+#RERANKER_MODEL   = "BAAI/bge-reranker-v2-m3"
+EMBEDDING_MODEL  = "intfloat/multilingual-e5-base"
 RERANKER_MODEL   = "cross-encoder/mmarco-mMiniLMv2-L12-H384-v1"
-RERANKER_MAXLEN  = 512   # bge-reranker-v2-m3 supports 1024+
+RERANKER_MAXLEN  = 512
+RERANKER_BATCH   = 64    # safe for FP16 on 6 GB VRAM; drop to 16 if OOM
+
+BM25_RECALL      = 1000  # full BM25 run for recall (tail padding)
+BM25_TOP         = 30    # BM25 candidates fed into the re-rank pool
+FAISS_TOP        = 100   # FAISS candidates fed into the re-rank pool
 
 
 class Searcher:
-    def __init__(self, analyzer, similarity, index_path: str, run_id: str, run_path: str, max_docs_retrieved: int):
-        # 1. Initialize Lucene
+    def __init__(self, analyzer, similarity, index_path: str,
+                 run_id: str, run_path: str, max_docs_retrieved: int):
+
+        # 1. Lucene
         self.index_dir = Paths.get(index_path)
         self.fs_dir = FSDirectory.open(self.index_dir)
         self.reader = DirectoryReader.open(self.fs_dir)
         self.searcher = IndexSearcher(self.reader)
         self.searcher.setSimilarity(similarity)
         self.analyzer = analyzer
-
-        self.run_id = run_id
         self.max_docs = max_docs_retrieved
 
-        # Prepare the output file
+        # Output file
         os.makedirs(run_path, exist_ok=True)
         self.run_file_path = os.path.join(run_path, f"{run_id}.txt")
+        self.run_id = run_id
         with open(self.run_file_path, 'w', encoding='utf-8') as f:
             pass
 
-        # 2. Initialize FAISS (Vectors)
+        # 2. FAISS
         print("[INFO] Loading FAISS vector database...")
         self.faiss_index = faiss.read_index(os.path.join(index_path, "corpus.faiss"))
         with open(os.path.join(index_path, "doc_ids.json"), 'r', encoding='utf-8') as f:
             self.faiss_doc_ids = json.load(f)
 
-        # 3. Initialize AI Models
-        print(f"[INFO] Loading dense encoder: {EMBEDDING_MODEL}")
-        self.dense_model = SentenceTransformer(EMBEDDING_MODEL)
-        print(f"[INFO] Loading cross-encoder: {RERANKER_MODEL}")
-        self.reranker = CrossEncoder(RERANKER_MODEL, max_length=RERANKER_MAXLEN)
+        # 3. Neural models — FP16 on GPU to halve VRAM usage
+        device = "cuda" if torch.cuda.is_available() else "cpu"
+        print(f"[INFO] Loading dense encoder: {EMBEDDING_MODEL}  (device={device})")
+        model_kwargs = {"torch_dtype": torch.float16} if device == "cuda" else {}
+        self.dense_model = SentenceTransformer(
+            EMBEDDING_MODEL, model_kwargs=model_kwargs, device=device
+        )
+
+        print(f"[INFO] Loading cross-encoder: {RERANKER_MODEL}  (device={device})")
+        self.reranker = CrossEncoder(
+            RERANKER_MODEL,
+            max_length=RERANKER_MAXLEN,
+            device=device,
+        )
         print("[INFO] Hybrid Engine Ready!\n")
 
-    def _get_doc_text(self, doc_id, lang):
-        """Retrieves full title and abstract from Lucene for the Re-ranker."""
-        query = TermQuery(Term("id", doc_id))
-        hits = self.searcher.search(query, 1).scoreDocs
-        if hits:
-            doc = self.searcher.storedFields().document(hits[0].doc)
-            title = doc.get(f"title_{lang}") or doc.get("title_en") or ""
-            abstract = doc.get(f"abstract_{lang}") or doc.get("abstract_en") or ""
-            return f"{title}. {abstract}"
-        return ""
+    # ------------------------------------------------------------------
+    # Internal: look up the stored text for a single doc_id via Lucene.
+    # Only called for FAISS-only candidates (those not already retrieved
+    # by the BM25 phase).  Kept for correctness; performance cost is
+    # bounded by (FAISS_TOP - overlap) ≤ FAISS_TOP lookups per query.
+    # ------------------------------------------------------------------
+    def _fetch_text(self, doc_id: str, lang: str) -> str:
+        hits = self.searcher.search(TermQuery(Term("id", doc_id)), 1).scoreDocs
+        if not hits:
+            return ""
+        doc = self.searcher.storedFields().document(hits[0].doc)
+        title    = doc.get(f"title_{lang}")    or doc.get("title_en")    or ""
+        abstract = doc.get(f"abstract_{lang}") or doc.get("abstract_en") or ""
+        return f"{title}. {abstract}"
 
     def search_topics(self, parser, expected_topics: int):
         print(f"#### Starting processing of {expected_topics} queries ####")
-        start_time = time.time()
+        start_time   = time.time()
         topics_count = 0
         stored_fields = self.searcher.storedFields()
 
         with open(self.run_file_path, 'a', encoding='utf-8') as run_file:
             for topic in tqdm(parser, total=expected_topics, desc="Searching", unit="query"):
                 topics_count += 1
-                bq_builder = BooleanQuery.Builder()
                 lang = topic.language
-                
+
+                # --- Build Lucene query (same as search.py) ---
                 if lang == "en":
                     fields_to_search = ["title_en", "abstract_en", "title_other", "abstract_other"]
                 else:
-                    fields_to_search = [f"title_{lang}", f"abstract_{lang}", "title_en", "abstract_en", "title_other", "abstract_other"]
+                    fields_to_search = [
+                        f"title_{lang}", f"abstract_{lang}",
+                        "title_en", "abstract_en",
+                        "title_other", "abstract_other",
+                    ]
 
                 qp = MultiFieldQueryParser(fields_to_search, self.analyzer)
+                bq_builder = BooleanQuery.Builder()
+
                 clean_text = topic.get_search_query()
-
-                # --- LUCENE QUERY (no manual hyphen stripping; analyzer handles it) ---
                 if clean_text:
-                    escaped_title = QueryParserBase.escape(clean_text)
-                    title_query = QueryParserBase.parse(qp, escaped_title)
-                    bq_builder.add(title_query, BooleanClause.Occur.SHOULD)
+                    escaped = QueryParserBase.escape(clean_text)
+                    bq_builder.add(QueryParserBase.parse(qp, escaped), BooleanClause.Occur.SHOULD)
 
-                # Journal boost (Bug fix: was self.qp → cross-language leakage).
                 journals_found = topic.extract_entities()
                 if journals_found:
-                    journals_text = " ".join(journals_found)
-                    escaped_desc = QueryParserBase.escape(journals_text)
-                    desc_query = QueryParserBase.parse(qp, escaped_desc)
-                    bq_builder.add(desc_query, BooleanClause.Occur.SHOULD)
+                    escaped_j = QueryParserBase.escape(" ".join(journals_found))
+                    bq_builder.add(QueryParserBase.parse(qp, escaped_j), BooleanClause.Occur.SHOULD)
 
                 final_query = bq_builder.build()
 
-                # ====================================================
-                # LO SWITCH ASIMMETRICO (IL "ROUTER")
-                # ====================================================
+                # ===========================================================
+                # STAGE 1 — BM25 full recall run (BM25_RECALL docs)
+                # Gives us the full ranked list for the tail (positions beyond
+                # the rerank pool) so R@1000 is preserved.
+                # ===========================================================
+                bm25_full = self.searcher.search(final_query, BM25_RECALL)
+
+                # Build an ordered list of (doc_id, bm25_score, text) from BM25
+                bm25_rows = []
+                for sd in bm25_full.scoreDocs:
+                    doc = stored_fields.document(sd.doc)
+                    d_id = doc.get(ParsedDocument.FIELDS.ID)
+                    if lang == "en":
+                        title    = doc.get("title_en")    or ""
+                        abstract = doc.get("abstract_en") or ""
+                    else:
+                        title    = doc.get(f"title_{lang}")    or doc.get("title_en")    or ""
+                        abstract = doc.get(f"abstract_{lang}") or doc.get("abstract_en") or ""
+                    text = f"{title}. {abstract}"
+                    bm25_rows.append((d_id, sd.score, text))
+
+                # ===========================================================
+                # EN fast path — BM25 is already very strong for English;
+                # reranking 3000+ EN queries with a 568M cross-encoder would
+                # take hours on CPU and marginal gain on EN (EN already 0.50+).
+                # Revisit if runtime budget allows.
+                # ===========================================================
                 if lang == "en":
-                    # Fast path: pure BM25 for English (kept here because the default
-                    # MiniLM cross-encoder regresses on English; revisit when swapping
-                    # to bge-reranker-v2-m3, where the uniform pipeline becomes safe).
-                    top_docs = self.searcher.search(final_query, self.max_docs)
+                    for rank, (d_id, score, _) in enumerate(bm25_rows[:self.max_docs], start=1):
+                        run_file.write(
+                            f"EN_{topic.query_id}\tQ0\t{d_id}\t{rank}\t{score:.6f}\t{self.run_id}\n"
+                        )
+                    continue
 
-                    for rank, sd in enumerate(top_docs.scoreDocs, start=1):
-                        doc_id = stored_fields.document(sd.doc).get(ParsedDocument.FIELDS.ID)
-                        score = sd.score
-                        # Scriviamo direttamente nel file TREC usando lo score di BM25
-                        line = f"{lang.upper()}_{topic.query_id}\tQ0\t{doc_id}\t{rank}\t{score:.6f}\t{self.run_id}\n"
-                        run_file.write(line)
-                        
-                else:
-                    # 🧠 PERCORSO INTELLIGENTE: IBRIDO + NEURALE (Tedesco e Francese) 🧠
-                    # Chiediamo a PyLucene 30 documenti da passare poi all'AI
-                    top_docs = self.searcher.search(final_query, 30) 
-                    lucene_ids = [stored_fields.document(sd.doc).get(ParsedDocument.FIELDS.ID) for sd in top_docs.scoreDocs]
+                # ===========================================================
+                # DE / FR: HYBRID RETRIEVAL + NEURAL RERANKING
+                # ===========================================================
 
-                    # --- B. FAISS SEARCH (Vector) ---
-                    q_vec = self.dense_model.encode([clean_text], show_progress_bar=False)
+                # Cache texts for the BM25 top candidates to avoid re-fetching
+                bm25_top_ids  = [row[0] for row in bm25_rows[:BM25_TOP]]
+                bm25_text_map = {row[0]: row[2] for row in bm25_rows[:BM25_TOP]}
+                bm25_id_set   = {row[0] for row in bm25_rows}
+
+                # STAGE 2 — FAISS dense search
+                if clean_text:
+                    q_vec = self.dense_model.encode(
+                        [f"query: {clean_text}"], show_progress_bar=False, convert_to_numpy=True
+                    )
                     q_vec = np.array(q_vec, dtype=np.float32)
                     faiss.normalize_L2(q_vec)
-                    _, indices = self.faiss_index.search(q_vec, 100) # Prende i Top 100
-                    faiss_ids = [self.faiss_doc_ids[idx] for idx in indices[0] if idx < len(self.faiss_doc_ids)]
+                    _, indices = self.faiss_index.search(q_vec, FAISS_TOP)
+                    faiss_ids = [
+                        self.faiss_doc_ids[idx]
+                        for idx in indices[0]
+                        if idx < len(self.faiss_doc_ids)
+                    ]
+                else:
+                    faiss_ids = []
 
-                    # --- C. FUSIONE E PREPARAZIONE ---
-                    candidate_ids = list(set(lucene_ids + faiss_ids)) # Rimuove i duplicati
-                    pairs = []
-                    valid_ids = []
-                    
-                    for d_id in candidate_ids:
-                        d_text = self._get_doc_text(d_id, lang)
-                        if d_text.strip():
-                            pairs.append([clean_text, d_text])
+                # STAGE 3 — Merge candidate pool (preserve order, deduplicate)
+                seen = set()
+                candidate_ids = []
+                for d_id in bm25_top_ids + faiss_ids:
+                    if d_id not in seen:
+                        seen.add(d_id)
+                        candidate_ids.append(d_id)
+
+                # Build (query, doc) pairs for the cross-encoder.
+                # Texts from BM25 cache are free; FAISS-only docs need a lookup.
+                pairs     = []
+                valid_ids = []
+
+                # mMarco-mMiniLMv2 max_length supported 512 token. Introducing chunking.
+                chunk_size = 250 
+                overlap = 50
+                for d_id in candidate_ids:
+                    if d_id in bm25_text_map:
+                        text = bm25_text_map[d_id]
+                    else:
+                        text = self._fetch_text(d_id, lang)
+                    '''
+                    if text.strip():
+                        pairs.append([clean_text, text])
+                        valid_ids.append(d_id)'''
+
+                    if not text.strip():
+                        continue
+
+                    words = text.strip().split()
+
+                    # dont 'cut' short documents
+                    if len(words) <= chunk_size:
+                        pairs.append([clean_text, text])
+                        valid_ids.append(d_id)
+                    else:
+                        # Chunking
+                        for i in range(0, len(words), chunk_size - overlap):
+                            chunk_words = words[i:i + chunk_size]
+                            chunk_text = " ".join(chunk_words)
+                            pairs.append([clean_text, chunk_text])
                             valid_ids.append(d_id)
 
-                    # --- D. NEURAL RE-RANKING ---
-                    if pairs:
-                        # L'AI valuta semanticamente i documenti di DE e FR
-                        scores = self.reranker.predict(pairs)
+                # STAGE 4 — Neural reranking
+                if pairs:
+                    scores = self.reranker.predict(pairs, batch_size=RERANKER_BATCH)
+                
+                    # Max-P Aggregation: teniamo solo il punteggio del chunk migliore
+                    doc_max_scores = {}
+                    for doc_id, score in zip(valid_ids, scores):
+                        if doc_id not in doc_max_scores or score > doc_max_scores[doc_id]:
+                            doc_max_scores[doc_id] = float(score)
+                    
+                    reranked = sorted(
+                        doc_max_scores.items(), key=lambda x: x[1], reverse=True
+                    )
+
+                else:
+                    reranked = []
+
+                # STAGE 5 — Write output
+                # Write reranked candidates first (positions 1..len(reranked)),
+                # then pad with the BM25 tail so every query has max_docs results.
+                written_ids = set()
+                rank = 1
+                for d_id, score in reranked:
+                    if rank > self.max_docs:
+                        break
+                    lang_up = lang.upper()
+                    run_file.write(
+                        f"{lang_up}_{topic.query_id}\tQ0\t{d_id}\t{rank}\t{score:.6f}\t{self.run_id}\n"
+                    )
+                    written_ids.add(d_id)
+                    rank += 1
+
+                # Tail: BM25 docs not already in the reranked pool
+                for d_id, bm25_score, _ in bm25_rows:
+                    if rank > self.max_docs:    
+                        break
+                    if d_id not in written_ids:
+                        lang_up = lang.upper()
+
+                        # CORREZIONE: Creiamo uno score fittizio bassissimo e decrescente 
+                        # in modo che ranx non lo porti mai in cima, rovinando l'MRR@5!
+                        tail_score = -1000.0 - rank
                         
-                        # Ordina dal punteggio più alto al più basso
-                        ranked_results = sorted(zip(valid_ids, scores), key=lambda x: x[1], reverse=True)
-                        
-                        # Save up to max_docs reranked results
-                        for rank, (doc_id, score) in enumerate(ranked_results[:self.max_docs], start=1):
-                            line = f"{lang.upper()}_{topic.query_id}\tQ0\t{doc_id}\t{rank}\t{score:.6f}\t{self.run_id}\n"
-                            run_file.write(line)
+                        run_file.write(
+                            f"{lang_up}_{topic.query_id}\tQ0\t{d_id}\t{rank}\t{tail_score:.6f}\t{self.run_id}\n" #al posto di tail_score prima c'era bm25_score
+                        )
+                        rank += 1
 
         elapsed = int(time.time() - start_time)
         print(f"Batch completed in {elapsed} seconds.\n")
@@ -188,17 +312,14 @@ class Searcher:
 
 
 if __name__ == "__main__":
-    # 1. Path Configuration
-    SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-    INDEX_PATH = os.path.abspath(os.path.join(SCRIPT_DIR, "..", "..", "experiment", "index"))
-    RUNS_PATH = os.path.abspath(os.path.join(SCRIPT_DIR, "..", "..", "experiment", "runs"))
+    SCRIPT_DIR  = os.path.dirname(os.path.abspath(__file__))
+    INDEX_PATH  = os.path.abspath(os.path.join(SCRIPT_DIR, "..", "..", "experiment", "index"))
+    RUNS_PATH   = os.path.abspath(os.path.join(SCRIPT_DIR, "..", "..", "experiment", "runs"))
     DATA_FOLDER = os.path.abspath(os.path.join(SCRIPT_DIR, "..", "..", "experiment", "docs"))
     JOURNALS_PATH = os.path.abspath(os.path.join(SCRIPT_DIR, "..", "Parse", "journals.txt"))
 
-    # 2. Lucene Analyzer Configuration — must mirror index.py / index_faiss.py
-    similarity = BM25Similarity(0.9, 0.8)
+    similarity  = BM25Similarity(0.9, 0.8)
     analyzer_map = HashMap()
-
     analyzer_map.put(f"{ParsedDocument.FIELDS.TITLE}_en",       EnglishAnalyzer())
     analyzer_map.put(f"{ParsedDocument.FIELDS.ABSTRACT}_en",    EnglishAnalyzer())
     analyzer_map.put(f"{ParsedDocument.FIELDS.TITLE}_fr",       FrenchAnalyzer())
@@ -207,28 +328,23 @@ if __name__ == "__main__":
     analyzer_map.put(f"{ParsedDocument.FIELDS.ABSTRACT}_de",    GermanAnalyzer())
     analyzer_map.put(f"{ParsedDocument.FIELDS.TITLE}_other",    StandardAnalyzer())
     analyzer_map.put(f"{ParsedDocument.FIELDS.ABSTRACT}_other", StandardAnalyzer())
-
     multi_analyzer = PerFieldAnalyzerWrapper(StandardAnalyzer(), analyzer_map)
 
-    # 3. Engine Initialization
-    # max_docs_retrieved=1000 is the TREC standard: needed for R@1000, MAP, NDCG.
-    # The previous value (5) silently invalidated every metric except P@1.
     engine = Searcher(
         analyzer=multi_analyzer,
         similarity=similarity,
         index_path=INDEX_PATH,
-        run_id="run-hybrid-reranked",
+        run_id="run-hybrid-reranked-v2tail",
         run_path=RUNS_PATH,
         max_docs_retrieved=1000,
     )
 
     journals_list = load_journals(JOURNALS_PATH)
 
-    # 4. Tasks (dev split: 195/100/100 — swap _dev → _train to evaluate on train).
     tasks = [
-        {"file": "en_dev.jsonl", "lang": "en", "expected": 195},
-        {"file": "de_dev.jsonl", "lang": "de", "expected": 100},
-        {"file": "fr_dev.jsonl", "lang": "fr", "expected": 100},
+        {"file": "en_dev.jsonl",  "lang": "en", "expected": 3905},
+        {"file": "de_dev.jsonl",  "lang": "de", "expected": 386},
+        {"file": "fr_dev.jsonl",  "lang": "fr", "expected": 702},
     ]
 
     try:
@@ -237,11 +353,12 @@ if __name__ == "__main__":
             if not os.path.exists(file_path):
                 print(f"Skipping {task['file']} — file not found.")
                 continue
-
             print(f"Processing: {task['file']}")
             with open(file_path, "r", encoding="utf-8") as f:
-                parser = JsonArrayQueryParser(f, lang_code=task["lang"], journal_list=journals_list)
+                parser = JsonArrayQueryParser(
+                    f, lang_code=task["lang"], journal_list=journals_list
+                )
                 engine.search_topics(parser, task["expected"])
     finally:
         engine.close()
-        print(f"#### Hybrid Search Completed! Results saved in: {RUNS_PATH}/run-hybrid-reranked.txt ####")
+        print(f"#### Hybrid Search Completed! Results in: {RUNS_PATH}/run-hybrid-reranked-v2tail.txt ####")

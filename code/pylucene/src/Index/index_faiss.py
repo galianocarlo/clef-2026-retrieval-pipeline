@@ -23,7 +23,8 @@ from org.apache.lucene.search.similarities import BM25Similarity
 # Both are retrieval-trained (paraphrase-MiniLM is paraphrase-trained, wrong
 # objective for retrieval). Keep MiniLM as the CPU-friendly default.
 # ─────────────────────────────────────────────────────────────────────────
-EMBEDDING_MODEL = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
+#EMBEDDING_MODEL = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
+EMBEDDING_MODEL = "intfloat/multilingual-e5-base"
 
 assert lucene.getVMEnv() or lucene.initVM()
 
@@ -86,7 +87,7 @@ class DirectoryIndexer:
 
         self.faiss_index_path = os.path.join(self.index_dir, "corpus.faiss")
         self.doc_ids_path = os.path.join(self.index_dir, "doc_ids.json")
-        self.batch_size = 32
+        self.batch_size = 4
         
         self.encoder = SentenceTransformer(EMBEDDING_MODEL)
         self.dim = self.encoder.get_embedding_dimension()
@@ -100,7 +101,7 @@ class DirectoryIndexer:
         if not self.text_batch:
             return
         
-        embeddings = self.encoder.encode(self.text_batch, show_progress_bar=False)
+        embeddings = self.encoder.encode(self.text_batch, show_progress_bar=False, convert_to_numpy = True) # FAISS needs float32
         embeddings = np.array(embeddings, dtype=np.float32)
         faiss.normalize_L2(embeddings)
         
