@@ -23,9 +23,9 @@ from org.apache.lucene.search.similarities import BM25Similarity
 # Both are retrieval-trained (paraphrase-MiniLM is paraphrase-trained, wrong
 # objective for retrieval). Keep MiniLM as the CPU-friendly default.
 # ─────────────────────────────────────────────────────────────────────────
-#EMBEDDING_MODEL = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
-EMBEDDING_MODEL = "intfloat/multilingual-e5-base"
-
+#EMBEDDING_MODEL = "BAAI/bge-m3"
+#EMBEDDING_MODEL = "intfloat/multilingual-e5-base"
+EMBEDDING_MODEL = os.environ.get("FAISS_MODEL", "BAAI/bge-m3")
 assert lucene.getVMEnv() or lucene.initVM()
 
 from src.Parse.parse_documents import ParsedDocument, JsonArrayDocumentParser

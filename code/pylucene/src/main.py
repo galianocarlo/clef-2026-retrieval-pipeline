@@ -34,7 +34,7 @@ def main():
     print(">>> Evaluating results...")
     run_script(os.path.join(BASE_DIR, "Evaluation", "evaluate.py"))
 
-    print("\n✅ PIPELINE COMPLETED SUCCESSFULLY!")
+    print("\n PIPELINE COMPLETED SUCCESSFULLY!")
 
 if __name__ == "__main__":
     main()

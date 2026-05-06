@@ -1,7 +1,7 @@
 import os
 import pandas as pd
 from datasets import load_dataset
-from huggingface_hub import login
+from huggingface_hub import login, hf_hub_download
 
 DATASET_ID = "sschellhammer/CT26_Task1_SourceRetrievalForScientificWebClaims"
 # 1. Get the absolute path of the directory where this script lives
@@ -23,9 +23,10 @@ def extract(language: str) -> dict:
     """Download the raw dataset for a given language from HuggingFace."""
     print(f"  [EXTRACT] Downloading '{language}' dataset...")
     data = load_dataset(DATASET_ID, name=language, trust_remote_code=True)
-    print(f"    -> train: {len(data['train'])} rows")
-    print(f"    -> dev:   {len(data['dev'])} rows")
-    return {"train": data["train"], "dev": data["dev"]}
+    print(f"    -> train: {len(data.get('train', []))} rows")
+    print(f"    -> dev:   {len(data.get('dev', []))} rows")
+    print(f"    -> test:  {len(data.get('test', []))} rows")
+    return {"train": data.get("train"), "dev": data.get("dev"), "test": data.get("test")}
 
 def extract_collection() -> object:
     """Download the raw paper collection from HuggingFace."""
@@ -60,22 +61,22 @@ def load_to_jsonl(df: pd.DataFrame, filename: str, target_dir: str = OUTPUT_DIR)
 
 # VALIDATION
 
-def validate(output_dir: str, corpus_dir: str) -> None:
+def validate(output_dir: str) -> None:
     """Basic validation: reload all JSONL files, check schemas, and verify row counts."""
     print("\n  [VALIDATE] Reloading and checking output files...")
 
     # We map the filename to its expected columns, its specific folder, and an optional row count
     expected_files = {
-        "en_train.jsonl":   {"cols": ["index", "text", "pubkey"], "dir": output_dir},
-        "en_dev.jsonl":     {"cols": ["index", "text", "pubkey"], "dir": output_dir},
-        "en_test.jsonl":    {"cols": ["index", "text", "pubkey"], "dir": output_dir},
-        "de_train.jsonl":   {"cols": ["index", "text", "pubkey"], "dir": output_dir},
-        "de_dev.jsonl":     {"cols": ["index", "text", "pubkey"], "dir": output_dir},
-        "de_test.jsonl":    {"cols": ["index", "text", "pubkey"], "dir": output_dir},
-        "fr_train.jsonl":   {"cols": ["index", "text", "pubkey"], "dir": output_dir},
-        "fr_dev.jsonl":     {"cols": ["index", "text", "pubkey"], "dir": output_dir},
-        "fr_test.jsonl":    {"cols": ["index", "text", "pubkey"], "dir": output_dir},
-        # We explicitly enforce the 34,237 row count for the collection!
+        "en_train.jsonl":         {"cols": ["index", "text", "pubkey"], "dir": output_dir},
+        "en_dev.jsonl":           {"cols": ["index", "text", "pubkey"], "dir": output_dir},
+        "final_en_test.jsonl":    {"cols": ["index", "text", "pubkey"], "dir": output_dir},
+        "de_train.jsonl":         {"cols": ["index", "text", "pubkey"], "dir": output_dir},
+        "de_dev.jsonl":           {"cols": ["index", "text", "pubkey"], "dir": output_dir},
+        "final_de_test.jsonl":    {"cols": ["index", "text", "pubkey"], "dir": output_dir},
+        "fr_train.jsonl":         {"cols": ["index", "text", "pubkey"], "dir": output_dir},
+        "fr_dev.jsonl":           {"cols": ["index", "text", "pubkey"], "dir": output_dir},
+        "final_fr_test.jsonl":    {"cols": ["index", "text", "pubkey"], "dir": output_dir},
+
         "collection.jsonl": {"cols": ["pubkey", "title", "venue", "authors", "abstract"], 
                              "dir": output_dir, 
                              "expected_rows": 10000}, # https://huggingface.co/datasets/sschellhammer/CT26_Task1_SourceRetrievalForScientificWebClaims/viewer/collection
@@ -96,7 +97,7 @@ def validate(output_dir: str, corpus_dir: str) -> None:
         # 1. Check Columns
         missing_cols = [c for c in rules["cols"] if c not in df.columns]
         if missing_cols:
-            print(f"    [❌] MISSING COLUMNS in {filename}: {missing_cols}")
+            print(f"MISSING COLUMNS in {filename}: {missing_cols}")
             all_ok = False
             continue
             
@@ -105,11 +106,11 @@ def validate(output_dir: str, corpus_dir: str) -> None:
         expected_rows = rules.get("expected_rows")
         
         if expected_rows and actual_rows != expected_rows:
-            print(f"    [❌] ROW MISMATCH in {filename}: Expected {expected_rows}, got {actual_rows}")
+            print(f"ROW MISMATCH in {filename}: Expected {expected_rows}, got {actual_rows}")
             all_ok = False
             continue
 
-        print(f"    [✅] OK  {filename:20s}  rows: {actual_rows:<6}  cols: {list(df.columns)}")
+        print(f"{filename:20s}  rows: {actual_rows:<6}  cols: {list(df.columns)}")
 
     if all_ok:
         print("\n  All files validated successfully. Data is pristine.")
@@ -118,8 +119,6 @@ def validate(output_dir: str, corpus_dir: str) -> None:
 
 
 # MAIN
-# ══════════════════════════════════════════════════════════════════════════════
-
 def main():
 
     # Authenticate
@@ -136,14 +135,22 @@ def main():
     os.makedirs(OUTPUT_DIR, exist_ok=True)
 
     # Process each language
+    # Process each language
     for lang in LANGUAGES:
         print(f"\nProcessing language: {lang.upper()}")
 
+        # 1. Scarica Train e Dev normalmente
         raw_all = load_dataset(DATASET_ID, name=lang, trust_remote_code=True)
-
         for split in ["train", "dev"]:
             df = transform_queries(raw_all[split])
             load_to_jsonl(df, f"{lang}_{split}.jsonl")
+
+        # 2. Scarica il Test "manualmente" in due righe
+        try:
+            test_file = hf_hub_download(repo_id=DATASET_ID, repo_type="dataset", filename=f"final_{lang}_test.json")
+            load_to_jsonl(pd.read_json(test_file), f"final_{lang}_test.jsonl")
+        except Exception as e:
+            print(f"File di test non trovato per {lang}: {e}")
 
     # Process collection
     print(f"\n{'─' * 40}")
@@ -152,11 +159,11 @@ def main():
     raw_col = extract_collection()
     
     df_col  = transform_collection(raw_col)
-    load_to_jsonl(df_col, "collection.jsonl", target_dir=CORPUS_DIR)
+    load_to_jsonl(df_col, "collection.jsonl", target_dir=OUTPUT_DIR)
 
     # Check for be sure
     print(f"\n{'─' * 40}")
-    validate(OUTPUT_DIR, CORPUS_DIR)
+    validate(OUTPUT_DIR)
     print(f"{'─' * 40}")
     print("\nETL pipeline completed successfully.")
     print(f"Output files are in: {OUTPUT_DIR}/")

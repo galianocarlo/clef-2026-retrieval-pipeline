@@ -30,7 +30,7 @@ from sentence_transformers import SentenceTransformer, CrossEncoder
 # Custom Imports
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 from src.Parse.parse_documents import ParsedDocument
-from src.Parse.parse_query import JsonArrayQueryParser, load_journals
+from src.Parse.parse_query import JsonArrayQueryParser
 
 # Initialize JVM
 assert lucene.getVMEnv() or lucene.initVM(), "Lucene version not available"
@@ -49,12 +49,10 @@ assert lucene.getVMEnv() or lucene.initVM(), "Lucene version not available"
 #   BM25_TOP        : top-N from BM25 to include in the candidate pool.
 #   FAISS_TOP       : top-N from FAISS to include in the candidate pool.
 # ─────────────────────────────────────────────────────────────────────────
-#EMBEDDING_MODEL  = "BAAI/bge-m3"
-#RERANKER_MODEL   = "BAAI/bge-reranker-v2-m3"
-EMBEDDING_MODEL  = "intfloat/multilingual-e5-base"
-RERANKER_MODEL   = "cross-encoder/mmarco-mMiniLMv2-L12-H384-v1"
-RERANKER_MAXLEN  = 512
-RERANKER_BATCH   = 64    # safe for FP16 on 6 GB VRAM; drop to 16 if OOM
+EMBEDDING_MODEL  = "BAAI/bge-m3"
+RERANKER_MODEL   = "BAAI/bge-reranker-v2-m3"
+RERANKER_MAXLEN  = 1024
+RERANKER_BATCH   = 4    # safe for FP16 on 6 GB VRAM; drop to 16 if OOM
 
 BM25_RECALL      = 1000  # full BM25 run for recall (tail padding)
 BM25_TOP         = 30    # BM25 candidates fed into the re-rank pool
@@ -147,11 +145,6 @@ class Searcher:
                     escaped = QueryParserBase.escape(clean_text)
                     bq_builder.add(QueryParserBase.parse(qp, escaped), BooleanClause.Occur.SHOULD)
 
-                journals_found = topic.extract_entities()
-                if journals_found:
-                    escaped_j = QueryParserBase.escape(" ".join(journals_found))
-                    bq_builder.add(QueryParserBase.parse(qp, escaped_j), BooleanClause.Occur.SHOULD)
-
                 final_query = bq_builder.build()
 
                 # ===========================================================
@@ -200,7 +193,7 @@ class Searcher:
                 # STAGE 2 — FAISS dense search
                 if clean_text:
                     q_vec = self.dense_model.encode(
-                        [f"query: {clean_text}"], show_progress_bar=False, convert_to_numpy=True
+                        [clean_text], show_progress_bar=False, convert_to_numpy=True
                     )
                     q_vec = np.array(q_vec, dtype=np.float32)
                     faiss.normalize_L2(q_vec)
@@ -226,50 +219,28 @@ class Searcher:
                 pairs     = []
                 valid_ids = []
 
-                # mMarco-mMiniLMv2 max_length supported 512 token. Introducing chunking.
-                chunk_size = 250 
-                overlap = 50
                 for d_id in candidate_ids:
                     if d_id in bm25_text_map:
                         text = bm25_text_map[d_id]
                     else:
                         text = self._fetch_text(d_id, lang)
-                    '''
-                    if text.strip():
-                        pairs.append([clean_text, text])
-                        valid_ids.append(d_id)'''
 
                     if not text.strip():
                         continue
-
-                    words = text.strip().split()
-
-                    # dont 'cut' short documents
-                    if len(words) <= chunk_size:
-                        pairs.append([clean_text, text])
-                        valid_ids.append(d_id)
-                    else:
-                        # Chunking
-                        for i in range(0, len(words), chunk_size - overlap):
-                            chunk_words = words[i:i + chunk_size]
-                            chunk_text = " ".join(chunk_words)
-                            pairs.append([clean_text, chunk_text])
-                            valid_ids.append(d_id)
+                    
+                    pairs.append([clean_text, text])
+                    valid_ids.append(d_id)
 
                 # STAGE 4 — Neural reranking
                 if pairs:
                     scores = self.reranker.predict(pairs, batch_size=RERANKER_BATCH)
                 
-                    # Max-P Aggregation: teniamo solo il punteggio del chunk migliore
-                    doc_max_scores = {}
-                    for doc_id, score in zip(valid_ids, scores):
-                        if doc_id not in doc_max_scores or score > doc_max_scores[doc_id]:
-                            doc_max_scores[doc_id] = float(score)
+                    # Mappatura diretta score-documento (niente più Max-P)
+                    doc_scores = {doc_id: float(score) for doc_id, score in zip(valid_ids, scores)}
                     
                     reranked = sorted(
-                        doc_max_scores.items(), key=lambda x: x[1], reverse=True
+                        doc_scores.items(), key=lambda x: x[1], reverse=True
                     )
-
                 else:
                     reranked = []
 
@@ -316,7 +287,6 @@ if __name__ == "__main__":
     INDEX_PATH  = os.path.abspath(os.path.join(SCRIPT_DIR, "..", "..", "experiment", "index"))
     RUNS_PATH   = os.path.abspath(os.path.join(SCRIPT_DIR, "..", "..", "experiment", "runs"))
     DATA_FOLDER = os.path.abspath(os.path.join(SCRIPT_DIR, "..", "..", "experiment", "docs"))
-    JOURNALS_PATH = os.path.abspath(os.path.join(SCRIPT_DIR, "..", "Parse", "journals.txt"))
 
     similarity  = BM25Similarity(0.9, 0.8)
     analyzer_map = HashMap()
@@ -334,18 +304,23 @@ if __name__ == "__main__":
         analyzer=multi_analyzer,
         similarity=similarity,
         index_path=INDEX_PATH,
-        run_id="run-hybrid-reranked-v2tail",
+        run_id="run-v4_test",
         run_path=RUNS_PATH,
         max_docs_retrieved=1000,
     )
 
-    journals_list = load_journals(JOURNALS_PATH)
-
+    tasks = [
+        {"file": "final_en_test.jsonl", "lang": "en", "expected": 6080},
+        {"file": "final_de_test.jsonl", "lang": "de", "expected": 876},
+        {"file": "final_fr_test.jsonl", "lang": "fr", "expected": 1220},
+    ]
+    
+    '''
     tasks = [
         {"file": "en_dev.jsonl",  "lang": "en", "expected": 3905},
         {"file": "de_dev.jsonl",  "lang": "de", "expected": 386},
         {"file": "fr_dev.jsonl",  "lang": "fr", "expected": 702},
-    ]
+    ]'''
 
     try:
         for task in tasks:
@@ -356,9 +331,9 @@ if __name__ == "__main__":
             print(f"Processing: {task['file']}")
             with open(file_path, "r", encoding="utf-8") as f:
                 parser = JsonArrayQueryParser(
-                    f, lang_code=task["lang"], journal_list=journals_list
+                    f, lang_code=task["lang"]
                 )
                 engine.search_topics(parser, task["expected"])
     finally:
         engine.close()
-        print(f"#### Hybrid Search Completed! Results in: {RUNS_PATH}/run-hybrid-reranked-v2tail.txt ####")
+        print(f"#### Hybrid Search Completed! Results in: {RUNS_PATH}/run-v4 ####")

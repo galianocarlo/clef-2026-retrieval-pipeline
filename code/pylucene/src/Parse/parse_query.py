@@ -20,12 +20,11 @@ class ParsedQuery:
         PUBKEY   = "pubkey"
 
     def __init__(self, query_id, text: str, language: str,
-                 pubkey: str, journal_list: list):
+                 pubkey: str):
         self.query_id     = query_id
         self.raw_text     = text
         self.language     = language
         self.pubkey       = pubkey
-        self.journal_list = journal_list
 
     def get_search_query(self) -> str:
         text = self.raw_text
@@ -39,17 +38,8 @@ class ParsedQuery:
         text = re.sub(r'\b(AND|OR|NOT)\b', lambda m: m.group().lower(), text)
         return " ".join(text.split()).strip()
 
-    def extract_entities(self) -> list:
-        return [
-            j for j in self.journal_list
-            if re.search(r'\b' + re.escape(j) + r'\b', self.raw_text.lower())
-        ]
-
     def __str__(self):
-        entities = self.extract_entities()
-        tag = f" [JOURNALS: {entities}]" if entities else ""
         return (f"--- Query #{self.query_id} ({self.language.upper()}) ---"
-                f"{tag}\n"
                 f"   CLEANED: {self.get_search_query()[:200]}...\n")
     
 
@@ -86,10 +76,9 @@ class QueryParser(ABC):
 class JsonArrayQueryParser(QueryParser):
     """Parser for JSONL query files """
 
-    def __init__(self, in_reader: io.TextIOBase, lang_code: str, journal_list: list):
+    def __init__(self, in_reader: io.TextIOBase, lang_code: str):
         super().__init__(in_reader)
         self.lang_code    = lang_code
-        self.journal_list = journal_list
         self.batch_size   = 500
         self.buffer       = deque()
 
@@ -118,32 +107,20 @@ class JsonArrayQueryParser(QueryParser):
                         text         = entry["text"],
                         language     = self.lang_code,
                         pubkey       = entry.get("pubkey"),
-                        journal_list = self.journal_list,
                     ))
                     count += 1
             except json.JSONDecodeError:
                 print(f"Skipping invalid JSON line.")
 
 
-def load_journals(filepath: str) -> list:
-    """Load journal names from a plain-text file, one per line."""
-    if not os.path.exists(filepath):
-        raise FileNotFoundError(f"journals file not found: {filepath}")
-    with open(filepath, 'r', encoding='utf-8') as f:
-        return [line.strip().lower() for line in f if line.strip()]
-
-
 if __name__ == "__main__":
     SCRIPT_DIR    = os.path.dirname(os.path.abspath(__file__))
-    JOURNALS_PATH = os.path.join(SCRIPT_DIR, "journals.txt")
     file_path     = "experiment/docs/en_train.jsonl"
     lang          = 'en'
 
-    journals = load_journals(JOURNALS_PATH)  # ← load first
-    print(journals)
     try:
         with open(file_path, "r", encoding="utf-8") as f:
-            parser = JsonArrayQueryParser(f, lang, journals)  # ← pass list, not path
+            parser = JsonArrayQueryParser(f, lang)  # ← pass list, not path
             for i, doc in enumerate(parser):
                 print(f"------------------------------------\n{doc}")
                 if i == 10:
