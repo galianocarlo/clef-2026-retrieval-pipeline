@@ -92,18 +92,18 @@ def main():
             lang_scores_accumulator[metric].append(score)
         print()
 
-    print("=======================================")
-    print("  OFFICIAL MACRO-AVERAGE (CODABENCH)   ")
-    print("=======================================")
+    print("==========================")
+    print("  OFFICIAL MACRO-AVERAGE  ")
+    print("==========================")
     # Calcola la media aritmetica (diviso 3) esattamente come la piattaforma CLEF
     for metric in metrics:
         scores = lang_scores_accumulator[metric]
         if len(scores) == len(languages):
             macro_avg = sum(scores) / len(languages)
-            print(f" MACRO {metric.upper():<10}: {macro_avg:.4f}  <-- OFFICIAL SCORE")
+            print(f" MACRO {metric.upper():<10}: {macro_avg:.4f}")
         else:
             print(f" MACRO {metric.upper():<10}: N/A (Missing languages in run)")
-    print("=======================================\n")
+    print("==========================\n")
 
 if __name__ == "__main__":
     main()
