@@ -1,11 +1,106 @@
 \section{Experimental Setup}
 \label{sec:setup}
 
-Describe the experimental setup, i.e.
+\subsection{Document Collection and Queries}
+\label{subsec:collection}
+
+\paragraph{Document corpus.}
+The document collection consists of 10{,}000 scientific publications 
+provided by the CLEF~2026 CheckThat!~Lab Task~1 organisers.
+Each publication is described by the following metadata fields: 
+\texttt{title}, \texttt{abstract}, \texttt{authors}, \texttt{venue}, 
+and a unique identifier \texttt{pubkey}.
+In our system, we index only the \texttt{title} and \texttt{abstract} 
+fields, as these carry the core semantic content of a paper and are 
+available for all documents in the corpus.
+
+\paragraph{Query sets.}
+The queries consist of short social media posts (tweets), partitioned 
+into three official splits: training, development, and test.
+Each query is provided as a \texttt{text} field containing the raw 
+social media content, along with a \texttt{pubkey} field that identifies 
+the single relevant document in the corpus.
+This yields a \textit{one-to-one relevance mapping}: each query is 
+associated with exactly one ground-truth document, making this a 
+highly precise but recall-agnostic retrieval setting.
+
+Table~\ref{tab:collection} summarises the statistics of the collection 
+and query splits.
+\begin{table}[h]
+  \caption{Collection and query statistics.}
+  \label{tab:collection}
+  \centering
+  \begin{tabular}{lrrr}
+    \toprule
+    Split & English & German & French \\
+    \midrule
+    Train queries & 8{,}329 & 4{,}296 & 4{,}296 \\
+    Dev queries   & 3905 & 386 & 702 \\
+    \midrule
+    Corpus documents & \multicolumn{3}{c}{10{,}000} \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\subsection{Evaluation Measures}
+\label{subsec:measures}
+
+We evaluate retrieval quality using the official metric \ac{MRR}@5, which rewards
+systems that place the single relevant document in the top-5 ranked positions.
+In addition, we report \ac{MAP}, \ac{NDCG}@10, Precision@1, and Recall@1000 to
+characterise different aspects of ranking quality.
+Evaluation is performed with the \texttt{ranx}~\cite{ranx} library using relevance
+judgements (\texttt{qrels}) derived from the ground-truth \texttt{pubkey} labels
+provided with each query.
+
+\subsection{Repository}
+\label{subsec:repo}
+
+The source code is publicly available at:
+\url{TODO: add bitbucket URL here}.
+%
+The repository is organised as follows:
 \begin{itemize}
-	\item used collections
-	\item evaluation measures
-	\item url to git repository and its organization
-	\item hardware used for experiments
-	\item ...
+  \item \texttt{pylucene/src/Index/} — indexing pipeline (\texttt{index.py},
+        \texttt{index\_faiss.py}) and the shared analyzer factory
+        (\texttt{analyzers.py}).
+  \item \texttt{pylucene/src/Search/} — retrieval scripts: \texttt{search.py}
+        (BM25 baseline), \texttt{search\_prf.py} (BM25 + \ac{PRF}),
+        \texttt{rerank.py} (neural cross-encoder re-ranking).
+  \item \texttt{pylucene/src/Parse/} — document and query parsers, and the
+        journal entity list (\texttt{journals.txt}).
+  \item \texttt{pylucene/src/Evaluation/} — evaluation scripts and failure
+        analysis utilities.
+  \item \texttt{experiment/} — generated artefacts (index, runs, qrels); not
+        committed to version control.
 \end{itemize}
+
+\subsection{Hardware and Software}
+\label{subsec:hardware}
+
+Experiments were conducted on three machines. All ran the retrieval pipeline
+inside a Docker container built from the official \texttt{coady/pylucene} image,
+which bundles PyLucene~9 (Lucene~9.x) on Python~3.11 (to check).
+
+\begin{table}[h]
+  \caption{Hardware specifications of the development machines.}
+  \label{tab:hardware}
+  \centering
+  \begin{tabular}{llll}
+    \toprule
+    Component & Machine~1 & Machine~2 & Machine~3 \\
+    \midrule
+    CPU & Intel Core i5-13420H  & AMD Ryzen AI 7 350    & Intel Core i7-6500U   \\
+        & (13th Gen)            &                       & @ 2.50\,GHz           \\
+    RAM & 32\,GB DDR5 5600\,MHz & 16\,GB DDR5 5600\,MHz & 12\,GB DDR4 2133\,MHz \\
+    GPU & Intel UHD Graphics    & AMD Radeon 860M +     & NVIDIA GeForce 920MX  \\
+        &                       & NVIDIA RTX~5060 Laptop&                       \\
+    OS  & Windows~11 Home       & Windows~11 Home       & Windows~10 Home       \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+The Docker environment also exposes a Jupyter notebook server on port~8888 for Exploratory Data Analysis. 
+The GPU of Machine~2 was used to accelerate the neural cross-encoder re-ranker (\texttt{rerank.py}) and 
+FAISS dense retrieval experiments (\texttt{index\_faiss.py} and \texttt{search\_faiss.py}). 
+All BM25 indexing , and \ac{PRF}  are fully reproducible on \ac{CPU} and were run on all three machines.
