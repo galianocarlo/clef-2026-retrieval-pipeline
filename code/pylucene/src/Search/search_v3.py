@@ -328,10 +328,18 @@ if __name__ == "__main__":
         analyzer=multi_analyzer,
         similarity=similarity,
         index_path=INDEX_PATH,
-        run_id="run-V3_dev",
+        run_id="run-V3_train",
         run_path=RUNS_PATH,
         max_docs_retrieved=1000,
     )
+
+    
+    tasks = [
+        {"file": "en_train.jsonl", "lang": "en", "expected": 14977},
+        {"file": "de_train.jsonl", "lang": "de", "expected": 1460},
+        {"file": "fr_train.jsonl", "lang": "fr", "expected": 2807},
+    ]
+    
     '''
     tasks = [
         {"file": "final_en_test.jsonl", "lang": "en", "expected": 6080},
@@ -339,12 +347,12 @@ if __name__ == "__main__":
         {"file": "final_fr_test.jsonl", "lang": "fr", "expected": 1220},
     ]
     '''
-    
+    '''
     tasks = [
         {"file": "en_dev.jsonl",  "lang": "en", "expected": 3905},
         {"file": "de_dev.jsonl",  "lang": "de", "expected": 386},
         {"file": "fr_dev.jsonl",  "lang": "fr", "expected": 702},
-    ]
+    ]'''
     
     try:
         for task in tasks:
