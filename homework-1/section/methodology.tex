@@ -116,10 +116,9 @@ iteration (V2) explored a statistical expansion technique known as \ac{PRF}.
     Due to the high precision required in the medical domain, this purely statistical expansion proved to be unsuitable.
 \end{itemize}
 
-\subsection{V3: Asymmetric Search and Semantic Re-ranking}
+\subsection{V3: Hybrid Asymmetric Search and Semantic Re-ranking}
 \label{subsec:methodology_v3}
-Once understood the performances of the statistical expansion, with V3 we introduced Deep Learning to understand the semantic intent behind the queries.
-We adopted an asymmetric architecture: English queries were routed through the fast BM25 pipeline, while French and German queries went through a two-stage retrieve-and-rerank process.
+Taking into consideration the lessons from V2, our third experiment (V3) moved from statistical expansion to a Deep Learning approach, with the intent to capture the true semantic. We adopted an asymmetric architecture that ensures high-precision reranking with computational efficiency.
 \begin{itemize}
     \item \textbf{Semantic Scoring:} Our experiment used a Transformer-based Cross-Encoder (\texttt{mmarco-mMiniLMv2-L12-H384-v1}). 
     Unlike Bi-Encoders, Cross-Encoders perform full self-attention across both the concatenated query and document, allowing the deep, word-level semantic interactions of importance in cross-lingual understanding.
@@ -131,9 +130,9 @@ We adopted an asymmetric architecture: English queries were routed through the f
     it was limited by BM25's initial retrieval suitability. If the lexical engine failed to retrieve a relevant cross-lingual document (based upon vocabulary mismatch), the neural re-ranker was unable to evaluate it.
 \end{itemize}
 
-\subsection{V4: Fully Asymmetric Hybrid Retrieval with Dense Vectors}
+\subsection{V4: Architecture with Long-Context Embeddings}
 \label{subsec:methodology_v4}
-To resolve the retrieval bottleneck identified in V3, our final architecture (V4) fully embraced Dense Retrieval, constructing a Hybrid candidate pool prior to the re-ranking phase.
+Although V3 successfully solved the cross-lingual vocabulary gap, the chunking strategy introduced computational burden and the possibility of breaking down long-range semantic dependencies. Our final iteration (V4) optimized the hybrid pipeline by replacing the neural backbone to state-of-the-art neural models designed for long documents.
 \begin{itemize}
     \item \textbf{Vector Space Projection:} To project queries and documents into a shared continuous
     vector space, we have integrated FAISS (Facebook AI Similarity Search) to avoid exact-match limitations. The corpus was encoded using the \texttt{intfloat/multilingual-e5-base} model.
