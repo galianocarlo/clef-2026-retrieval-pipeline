@@ -68,13 +68,16 @@ def validate(output_dir: str, corpus_dir: str) -> None:
     expected_files = {
         "en_train.jsonl":   {"cols": ["index", "text", "pubkey"], "dir": output_dir},
         "en_dev.jsonl":     {"cols": ["index", "text", "pubkey"], "dir": output_dir},
+        "en_test.jsonl":    {"cols": ["index", "text", "pubkey"], "dir": output_dir},
         "de_train.jsonl":   {"cols": ["index", "text", "pubkey"], "dir": output_dir},
         "de_dev.jsonl":     {"cols": ["index", "text", "pubkey"], "dir": output_dir},
+        "de_test.jsonl":    {"cols": ["index", "text", "pubkey"], "dir": output_dir},
         "fr_train.jsonl":   {"cols": ["index", "text", "pubkey"], "dir": output_dir},
         "fr_dev.jsonl":     {"cols": ["index", "text", "pubkey"], "dir": output_dir},
+        "fr_test.jsonl":    {"cols": ["index", "text", "pubkey"], "dir": output_dir},
         # We explicitly enforce the 34,237 row count for the collection!
         "collection.jsonl": {"cols": ["pubkey", "title", "venue", "authors", "abstract"], 
-                             "dir": corpus_dir, 
+                             "dir": output_dir, 
                              "expected_rows": 10000}, # https://huggingface.co/datasets/sschellhammer/CT26_Task1_SourceRetrievalForScientificWebClaims/viewer/collection
     }
 
@@ -83,7 +86,7 @@ def validate(output_dir: str, corpus_dir: str) -> None:
         path = os.path.join(rules["dir"], filename)
         
         if not os.path.exists(path):
-            print(f"    [❌] MISSING FILE: {path}")
+            print(f"MISSING FILE: {path}")
             all_ok = False
             continue
 
