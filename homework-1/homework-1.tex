@@ -2,14 +2,15 @@
 
 \usepackage{acronym}
 \usepackage{subcaption}
-
+\input{acronyms.tex}
 \renewcommand{\acffont}[1]{\textsl{#1}}
 
 
 %%
 %% end of the preamble, start of the body of the document source.
 \begin{document}
-
+\bibliographystyle{plainnat}
+\bibliography{bibliography}
 %%
 %% Rights management information.
 %% CC-BY is default license.
@@ -24,7 +25,7 @@
 
 %%
 %% The "title" command
-\title{SEUPD@CLEF: Team <Acronym>}
+\title{SEUPD@CLEF: Team DSPY}
 
 %%
 %% The "author" command and its associated commands are used to define
@@ -37,8 +38,8 @@ email=name.surname@studenti.unipd.it
 email=name.surname@studenti.unipd.it
 ]
 
-\author[1]{Name Surname}[%
-email=name.surname@studenti.unipd.it
+\author[1]{Stefano Riato}[%
+email=stefano.riato@studenti.unipd.it
 ]
 
 \address[1]{University of Padua, Italy}
@@ -73,7 +74,7 @@ email=name.surname@studenti.unipd.it
 
 \input{section/introduction}
 
-\input{section/related-work}
+\input{section/related-worked}
 
 \input{section/methodology}
 
@@ -85,7 +86,7 @@ email=name.surname@studenti.unipd.it
 
 \input{section/contributions}
 
-\input{section/added-section-to-be-removed}
+%\input{section/added-section-to-be-removed}
 
 
 \end{document}
