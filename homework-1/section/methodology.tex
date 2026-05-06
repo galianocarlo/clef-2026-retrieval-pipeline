@@ -2,3 +2,77 @@
 \label{sec:methodology}
 
 Describe the methodology you have adopted, the architecture of your system, your workflow, etc.
+
+
+
+\subsection{Document and Query Parsing}
+
+Documents and queries are parsed through dedicated classes that implement
+the Python iterator protocol, allowing the system to process the files sequentially without loading the whole collection into memory in one step.
+
+
+
+\subsubsection{Document Parsing}
+The \texttt{JsonArrayDocumentParser} reads the data collection in sets of
+500 documents. For each document, the title and abstract are concatenated together and passed to the \texttt{langdetect} library to assign a language label (\texttt{en}, \texttt{de}, \texttt{fr}, or \texttt{other}).
+Each document in the collection is coded as a \texttt{ParsedDocument} object
+carrying its ID, title, abstract, and detected language (which will be later used to determine the analyzer in the indexing phase).
+
+\subsubsection{Query Parsing}
+Queries are parsed by the \texttt{JsonArrayQueryParser}, which follows the
+same pattern built for document parsing. Since being social media tweets and not scientific paper as in the case of the documents, queries are "cleaned":
+mentions, URLs, and hashtag symbols are removed while alphanumeric content and essential punctuation are kept. Moreover, the \texttt{extract\_entities()} method scans each quary looking for the presence of scientific journal names from \texttt{journals.txt}; if the match has a positive correspondence, in searching phase documents published on that journal will get a boost.
+An important difference to bring to light regarding the language detection: queries are partitioned for language, hence no language tag is assigned to them.
+
+
+\subsection{Data Preprocessing}
+The linguistic textual preprocessing, both for documents and queries, is executed through the Lucene's built-in analyzers:
+\begin{itemize}
+    \item \item \texttt{EnglishAnalyzer} — tokenization, lowercase conversion, English stopword removal, and Porter stemming
+    \item \texttt{GermanAnalyzer} — tokenization, lowercase conversion, 
+German stopword removal, and Snowball stemming
+    \item \texttt{FrenchAnalyzer} — tokenization, lowercase conversion, 
+French stopword removal, and French light stemming
+    \item \texttt{StandardAnalyzer} — tokenization and lowercase 
+    conversion only, used as a fallback for other languages with no query correspondence (Italian and Spanish)
+\end{itemize}
+
+\subsubsection{Regular Expressions}
+The very first textual preprocessing applied was "manually" built since relied on:
+\begin{itemize}
+    \item lowercase conversion to ensure case-insensitive matching.
+    \item regular expression for tokenization and HTML tag removal. In detail \texttt{re.sub(r'<[{\textasciicircum}]+>', '', text)} 
+    to strip HTML tags and \texttt{RegexpTokenizer(r'[A-Za-z0-9\%\textbackslash.\textbackslash-]+')} 
+    to extract only alphanumeric tokens, percentages, and hyphenated 
+    compounds such as \textit{SARS-CoV-2}.
+    \item the NLTK library for Snowball stemming and stopword removal
+\end{itemize}
+
+This approach was discarded because of two reasons, the first one related to the risk of mismatching between document and query indexing, and - more importantly - the run score obtained with the manual approach was less effective than those achieved using Lucene's analyzers.
+
+An early preprocessing approach explored during development relied on 
+a custom \texttt{TextProcessor} class built on top of NLTK. For each 
+document or query, the pipeline applied HTML tag removal via regular 
+expressions, tokenisation through a \texttt{RegexpTokenizer} 
+(\texttt{[A-Za-z0-9\%\textbackslash.\textbackslash-]+}), stopword 
+removal, and Snowball stemming — all handled explicitly in Python for 
+English, French, and German.
+
+
+
+
+\subsection{Embeddings}
+As mentioned previously, our information retrieval pipeline built exploits embeddings. To clarify how the are used it is necessary to make a  distinction between \textbf{sparse} and \textbf{dense} embeddings. 
+\textit{Sparse} embeddings are high-dimensional vectors in which the majority of elements are 0, making them computationally lightweight. These vectors do not catch any sentence meaning, and therefore they are suitable for exact-matching task. On the other hand, \textit{Dense} embeddings are low-dimensional vectors, where each dimension carries a fragment of semantic meaning. In detail, the contextual embeddings created with the model
+paraphrase-multilingual-MiniLM-L12-v2 are \textit{contextual}, allowing the retrieval of information that goes beyond the "vocabulary mismatch".
+
+
+
+\subsection{Pseudo-Relevance Feedback}
+One of the runs was obtained by augmenting the baseline through \textbf{Pseudo-Relevance Feedback} (PRF), with the intent of reducing the vocabulary mismatch between documents and queries (written as informal social media posts).
+
+\textit{Pseudo-Relevance Feedback} is a query expansion technique that enriches the query using the vocabulary of the top ranked documents retrieved. The strong assumption, on which the technique relies, lies in the relevance of the documents retrieved using the BM25 model.
+
+In our system, PRF works as a two stage process. In the part the query is executed and the top 3 documents are retrieved; their title and abstract are concatenated and processed in order to extract the 5 most frequent tokens (non stopword with a minimal length of 4 characters). In the second stage, these terms are added alongside the original query as \textbf{SHOULD} clause, so that PRF can only boost a document without excluding those only  matching the original query.
+
+However, this approach did not lead to the expected improvements: the score produced was lower than the baseline obtained using the BM25 model. The likely reason is that PRF's effectiveness strongly depends on the quality of the initial retrieval - if the top ranked documents retrieved are not relevant, the query expansion introduces a lot of noise causing a phenomenon called \textit{query drift}. 
