@@ -31,13 +31,13 @@ V4 achieves the best results on the development set and represents the final ret
 
 \subsection{Results Tables}
 
-\newcolumntype{C}{>{\centering\arraybackslash}X}
-\newcolumntype{R}{>{\raggedright\arraybackslash}p{5.8cm}}
-
-\begin{table}[H]
+\vspace{1em}
+\noindent
+\begin{minipage}{\linewidth}
 \centering
-\caption{Averaged results on the development set.}
-\begin{tabularx}{\textwidth}{RCCC}
+\captionof{table}{Averaged results on the development set.}
+\label{tab:dev_macro}
+\begin{tabularx}{\linewidth}{LCCC}
 \toprule
 \textbf{Run} & \textbf{MRR@5} & \textbf{MAP} & \textbf{NDCG@10} \\
 \midrule
@@ -47,13 +47,16 @@ V1 — BM25 Baseline               & 0.2190          & 0.2322          & 0.2488 
 V2 — BM25 + PRF                  & 0.1892          & 0.2011          & 0.2185          \\
 \bottomrule
 \end{tabularx}
-\label{tab:dev_macro}  %questi sono i nomi delle tabelle da citare per l'interazione
-\end{table}
+\end{minipage}
+\vspace{1em}
 
-\begin{table}[H]
+\vspace{1em}
+\noindent
+\begin{minipage}{\linewidth}
 \centering
-\caption{Per-language metrics result in the development set.}
-\begin{tabularx}{\textwidth}{RCCCC}
+\captionof{table}{Per-language metrics result in the development set.}
+\label{tab:dev_lang}
+\begin{tabularx}{\linewidth}{LCCCC}
 \toprule
 \textbf{Run} & \textbf{EN} & \textbf{DE} & \textbf{FR} & \textbf{Avg} \\
 \midrule
@@ -63,13 +66,16 @@ V1 — BM25 Baseline               & \textbf{0.4910} & 0.0968          & 0.0691 
 V2 — BM25 + PRF                  & 0.4285          & 0.0806          & 0.0585          & 0.1892          \\
 \bottomrule
 \end{tabularx}
-\label{tab:dev_lang} %questi sono i nomi delle tabelle da citare per l'interazione
-\end{table}
+\end{minipage}
+\vspace{1em}
 
-\begin{table}[H]
+\vspace{1em}
+\noindent
+\begin{minipage}{\linewidth}
 \centering
-\caption{Averaged results on the training set.}
-\begin{tabularx}{\textwidth}{RCCC}
+\captionof{table}{Averaged results on the training set.}
+\label{tab:train_macro}
+\begin{tabularx}{\linewidth}{LCCC}
 \toprule
 \textbf{Run} & \textbf{MRR@5} & \textbf{MAP} & \textbf{NDCG@10} \\
 \midrule
@@ -78,13 +84,16 @@ V1 — BM25 Baseline               & 0.2301          & 0.2437          & 0.2606 
 V2 — BM25 + PRF                  & 0.1971          & 0.2102          & 0.2284          \\
 \bottomrule
 \end{tabularx}
-\label{tab:train_macro} %questi sono i nomi delle tabelle da citare per l'interazione
-\end{table}
+\end{minipage}
+\vspace{1em}
 
-\begin{table}[H]
+\vspace{1em}
+\noindent
+\begin{minipage}{\linewidth}
 \centering
-\caption{Per-language metrics result in the training set}
-\begin{tabularx}{\textwidth}{RCCCC}
+\captionof{table}{Per-language metrics result in the training set}
+\label{tab:train_lang}
+\begin{tabularx}{\linewidth}{LCCCC}
 \toprule
 \textbf{Run} & \textbf{EN} & \textbf{DE} & \textbf{FR} & \textbf{Avg} \\
 \midrule
@@ -93,8 +102,5 @@ V1 — BM25 Baseline               & \textbf{0.5028} & 0.0970          & 0.0904 
 V2 — BM25 + PRF                  & 0.4377          & 0.0795          & 0.0742          & 0.1971          \\
 \bottomrule
 \end{tabularx}
-\label{tab:train_lang} %questi sono i nomi delle tabelle da citare per l'interazione
-\end{table}
-
-
-
+\end{minipage}
+\vspace{1em}
