@@ -18,13 +18,11 @@ from org.apache.lucene.search.similarities import BM25Similarity
 # ─────────────────────────────────────────────────────────────────────────
 # Embedding model. MiniLM is small enough to encode on CPU (~30 min for 10k
 # docs). On a GPU, swap to one of:
-#   "intfloat/multilingual-e5-large"   (560M, 1024d, retrieval-tuned)
+#   "intfloat/multilingual-e5-base"   (278M, 512d, retrieval-tuned)
 #   "BAAI/bge-m3"                      (568M, 1024d, 8k context)
 # Both are retrieval-trained (paraphrase-MiniLM is paraphrase-trained, wrong
 # objective for retrieval). Keep MiniLM as the CPU-friendly default.
 # ─────────────────────────────────────────────────────────────────────────
-#EMBEDDING_MODEL = "BAAI/bge-m3"
-#EMBEDDING_MODEL = "intfloat/multilingual-e5-base"
 EMBEDDING_MODEL = os.environ.get("FAISS_MODEL", "BAAI/bge-m3")
 assert lucene.getVMEnv() or lucene.initVM()
 

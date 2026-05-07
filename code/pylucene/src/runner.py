@@ -83,7 +83,7 @@ def main():
         if input("(y/n): ").strip().lower() == 'y':
             print("\n--- PHASE 3: METRICS EVALUATION ---")
             run_path = f"experiment/runs/{run_filename}"
-            # Passa in automatico al valutatore il flag --split train o --split dev
+            
             evaluate_script = ["python", "src/Evaluation/evaluate.py", run_path, "--split", split_choice]
             run_command(evaluate_script, env=current_env)
     else:

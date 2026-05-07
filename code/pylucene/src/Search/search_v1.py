@@ -93,9 +93,6 @@ class Searcher:
                 # --- A. THE MAIN QUERY (The cleaned tweet) ---
                 clean_text = topic.get_search_query()
                 if clean_text:
-                    # Stemming the queries
-                    # stemmed_tokens = processor.process(clean_text, topic.language)
-                    # stemmed_text = " ".join(stemmed_tokens)
                     # Escape special characters so Lucene doesn't crash on weird math symbols
                     escaped_title = QueryParserBase.escape(clean_text)
                     title_query = QueryParserBase.parse(qp, escaped_title)
@@ -105,8 +102,6 @@ class Searcher:
                 # --- C. THE LANGUAGE FILTER (The CheckThat! requirement) ---
                 # MUST means "If the document is not this language, drop it instantly"
                 lang_term = TermQuery(Term("lang", topic.language))
-                
-                #bq_builder.add(lang_term, BooleanClause.Occur.MUST) # Testing langedetect bugs
 
                 # Finalize the query
                 final_query = bq_builder.build()

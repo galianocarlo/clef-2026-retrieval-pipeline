@@ -49,8 +49,6 @@ assert lucene.getVMEnv() or lucene.initVM(), "Lucene version not available"
 #   BM25_TOP        : top-N from BM25 to include in the candidate pool.
 #   FAISS_TOP       : top-N from FAISS to include in the candidate pool.
 # ─────────────────────────────────────────────────────────────────────────
-#EMBEDDING_MODEL  = "BAAI/bge-m3"
-#RERANKER_MODEL   = "BAAI/bge-reranker-v2-m3"
 EMBEDDING_MODEL  = "intfloat/multilingual-e5-base"
 RERANKER_MODEL   = "cross-encoder/mmarco-mMiniLMv2-L12-H384-v1"
 RERANKER_MAXLEN  = 512

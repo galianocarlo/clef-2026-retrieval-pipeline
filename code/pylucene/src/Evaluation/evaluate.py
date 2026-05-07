@@ -65,7 +65,6 @@ def main():
     qrels_dict = qrels.to_dict()
     run_dict = run.to_dict()
     
-    # Dizionario per memorizzare i punteggi di ogni lingua
     lang_scores_accumulator = {m: [] for m in metrics}
 
     print("\n=======================================")

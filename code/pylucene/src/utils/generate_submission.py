@@ -13,7 +13,7 @@ from collections import defaultdict
 #
 # Usage:
 #   python generate_submission.py                          (uses default run)
-#   python generate_submission.py path/to/run-hybrid-best.txt
+#   python generate_submission.py path/to/run-V*_{split}.txt
 # =============================================================================
 
 LANGUAGES = ["EN", "DE", "FR"]

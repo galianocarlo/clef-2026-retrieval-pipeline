@@ -44,7 +44,7 @@ def main():
         split_arg = "train" if "train" in filename.lower() else "dev"
         print(f"Evaluating: {filename} on {split_arg.upper()} set...")
         
-        # DIFESA 1 e 2: sys.executable assicura l'ambiente corretto, encoding previene crash Windows
+        # CHECK 1 & 2: sys.executable ensures the correct environment, encoding prevents Windows crashes
         result = subprocess.run(
             [sys.executable, EVAL_SCRIPT, file_path, "--split", split_arg], 
             capture_output=True, 
@@ -52,15 +52,15 @@ def main():
             encoding="utf-8"
         )
         
-        # DIFESA 3: Se evaluate.py fallisce brutalmente, stampiamo l'errore REALE di Python
+        # CHECK 3: If evaluate.py crashes hard, we print the ACTUAL Python error
         if result.returncode != 0:
             print(f"CRASH evaluating {filename}. Skipping.")
             print(f"   --> error: {result.stderr.strip()}")
             continue
 
-        # Se evaluate.py è uscito correttamente ma non ha trovato i file qrels
+        # If evaluate.py exited successfully but couldn't find the qrels files
         if "[!] Error:" in result.stdout:
-            print(f"FILE MANCANTE in {filename}:")
+            print(f"MISSING FILE in {filename}:")
             print(f"   --> {result.stdout.strip()}")
             continue
 
@@ -92,14 +92,14 @@ def main():
     dev_results.sort(key=lambda x: x["mrr"], reverse=True)
     train_results.sort(key=lambda x: x["mrr"], reverse=True)
 
-    print("\n📝 Stesura del report finale in corso...")
+    print("\nStesura del report finale in corso...")
     with open(report_output_path, "w", encoding="utf-8") as report_file:
         
         report_file.write("=========================================================\n")
         report_file.write("   SEUPD 25/26 - GLOBAL RUN METRICS REPORT               \n")
         report_file.write("=========================================================\n\n")
         
-        report_file.write("🏆 LEADERBOARD - DEV SET (Ordinata per MACRO MRR@5)\n")
+        report_file.write("LEADERBOARD - DEV SET\n")
         report_file.write("-" * 135 + "\n")
         report_file.write(f"| {'Pos':<3} | {'Run File':<25} | {'MRR@5':<7} | {'P@1':<7} | {'R@1000':<7} | {'Descrizione'}\n")
         report_file.write("-" * 135 + "\n")
@@ -107,7 +107,7 @@ def main():
             report_file.write(f"| {i:<3} | {res['filename']:<25} | {res['mrr']:.4f}  | {res['p1']:.4f}  | {res['r1000']:.4f}   | {res['description']}\n")
         report_file.write("-" * 135 + "\n\n")
 
-        report_file.write("🏆 LEADERBOARD - TRAIN SET (Ordinata per MACRO MRR@5)\n")
+        report_file.write("LEADERBOARD - TRAIN SET\n")
         report_file.write("-" * 135 + "\n")
         report_file.write(f"| {'Pos':<3} | {'Run File':<25} | {'MRR@5':<7} | {'P@1':<7} | {'R@1000':<7} | {'Descrizione'}\n")
         report_file.write("-" * 135 + "\n")
@@ -115,7 +115,7 @@ def main():
             report_file.write(f"| {i:<3} | {res['filename']:<25} | {res['mrr']:.4f}  | {res['p1']:.4f}  | {res['r1000']:.4f}   | {res['description']}\n")
         report_file.write("-" * 135 + "\n\n")
 
-        report_file.write("📄 RUNS DETAILS\n")
+        report_file.write("RUNS DETAILS\n")
         report_file.write("=========================================================\n\n")
         
         for res_list in [dev_results, train_results]:

@@ -41,7 +41,6 @@ def generate_qrels_for_split(split: str, docs_dir: str) -> str:
                     continue
                 try:
                     entry = json.loads(line)
-                    # Usiamo direttamente la variabile lang invece di tagliare il nome del file!
                     lang_prefix = lang.upper() 
                     
                     query_id = f"{lang_prefix}_{str(entry.get('index', ''))}"

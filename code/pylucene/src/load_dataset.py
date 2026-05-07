@@ -139,13 +139,13 @@ def main():
     for lang in LANGUAGES:
         print(f"\nProcessing language: {lang.upper()}")
 
-        # 1. Scarica Train e Dev normalmente
+        # 1. Download Train e Dev sets
         raw_all = load_dataset(DATASET_ID, name=lang, trust_remote_code=True)
         for split in ["train", "dev"]:
             df = transform_queries(raw_all[split])
             load_to_jsonl(df, f"{lang}_{split}.jsonl")
 
-        # 2. Scarica il Test "manualmente" in due righe
+        # 2. Download Test set "manually"
         try:
             test_file = hf_hub_download(repo_id=DATASET_ID, repo_type="dataset", filename=f"final_{lang}_test.json")
             load_to_jsonl(pd.read_json(test_file), f"final_{lang}_test.jsonl")
