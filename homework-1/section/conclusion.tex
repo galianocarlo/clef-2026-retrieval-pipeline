@@ -1,6 +1,19 @@
 \section{Conclusions and Future Work}
 \label{sec:conclusion}
 
-Provide a summary of what are the main achievements and findings. 
+\subsection{Conclusions}
 
-Discuss future work, e.g. what you may try next and/or how your approach could be further developed.
+This paper presented four retrieval systems developed for the Scientific Retrieval task proposed by CLEF, addressing the challenge of matching informal social media queries to multilingual scientific documents in English, French, and German.
+\noindent Our experiments expose a consistent progression in retrieval achievement (measured as scores of the metrics used) across the runs. The baseline, while on one hand established the upper bound for English queries, on the other hand highlighted the structural limits of an exact matching system based; indeed, the vocabulary mismatch between informal social media posts and scientific documents caused the collapse of the metrics scores for German and French.  The attempt to address this gap through the query expansion technique Pseudo Relevance Feedback has further decreased the scores, confirming the poor quality of the initial retrieval set. The introduction of hybrid dense-sparse retrieval through FAISS, combined with a Cross-Encoder re-ranker, produced a first substantial improvement in the retrieval of non English queries; indeed, the deep neural networks used for German and French allowed the retrieval of documents thanks to the semantic embeddings similarity. 
+\noindent The final architecture refined the hybrid pipeline by using a more powerful long-context retrieval model, which eliminated the previous chunking need. The results achieved were the highest and most balanced across all three languages, confirming that the hybrid dense-sparse retrieval with a neural re-ranking represents the most effective architecture for multilingual scientific document retrieval in this setting.
+
+\subsection{Future Work}
+\label{sec:future_work}
+
+The results obtained in this work highlight and suggest several directions that could improve retrieval quality and system design.
+
+\noindent The different pipelines demonstrated the huge contribution of semantic retrieval to query performance. A natural follow up would be to investigate more specifically natural language processing strategies in order to adapt the search to the data nature.
+
+\noindent A deliberate structural choice throughout our experiments was to avoid translation, since we were concerned about introducing noise or losing key terminology fundamental for the retrieval process. However, our results suggest that this strategy should be tested: large language models could be exploited for translation. Moreover, witnessing the failure of PRF strategy, LLMs could also be used for modern query expansion techniques.
+
+\noindent From a software engineering perspective, our development process revealed a significant technical debt: each system version was implemented as an independent pipeline, which on one hand reduced the time required to implement each run, but on the other hand made it harder to explore alternatives and collaborate among the team members. Future work should prioritize the design of an architecture within which main components are defined as a class, making it easier to swap them inside a unique pipeline. This would reduce the cost, both in terms of building and running time, enabling a more practical work environment. 

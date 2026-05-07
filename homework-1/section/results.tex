@@ -1,6 +1,106 @@
-\section{Results and Discussion}
+\section{Experimental Results}
 \label{sec:results}
 
-Provide a summary of the performance on the previous year dataset.
+This section presents the quantitative evaluation of the four runs in the development and training phases. The results highlight how each architectural decision was motivated by the limitations witnessed in the previous system.
 
-Discuss the results and any relevant issues.
+
+\subsection{V1 — BM25 Baseline}
+
+V1 is the starting reference point for all subsequent runs. As shown in 
+Table~\ref{tab:dev_macro}, it achieves an average MRR@5 of 0.2190, a MAP of 0.2322, and an NDCG@10 of 0.2488 on the development set. The per-language division in Table~\ref{tab:dev_lang} displays a strong imbalance among the languages: English reaches MRR@5 = 0.4910, while German and French respectively have the scores 0.0968 and 0.0691. This huge gap suggests that the baseline is competitive for English, but much less effective in the multilingual setting addressed by the task. In the training set, the same pattern remains visible. Table~\ref{tab:train_macro} shows that V1 reaches an average MRR@5 of 0.2301, MAP of 0.2437, and NDCG@10 of 0.2606, while Table~\ref{tab:train_lang} reports MRR@5 values of 0.5028 for English, 0.0970 for German, and 0.0904 for French. The consistency between development and training results highlights that the main limitation of V1 is structural rather than split-specific, and therefore motivates the search for a system that can improve non English query retrieval.
+
+
+\subsection{V2 — Pseudo-Relevance Feedback}
+
+V2 was the first system developed as an attempt to improve the baseline retrieval , but as previously anticipated, the results show a consistent deterioration. In the development set, Table~\ref{tab:dev_macro} shows that average MRR@5 decreases from 0.2190 in V1 to 0.1892 in V2, while MAP drops from 0.2322 to 0.2011 and NDCG@10 from 0.2488 to 0.2185. The same trend repeated itself in the training set, where average MRR@5 falls from 0.2301 to 0.1971, MAP from 0.2437 to 0.2102, and NDCG@10 from 0.2606 to 0.2284 (Table~\ref{tab:train_macro}).
+
+\noindent The per language results confirm that the decrease is not attributable to a single language. In the development set (Table~\ref{tab:dev_lang}), English MRR@5 goes down from 0.4910 to 0.4285, German from 0.0968 to 0.0806, and French from 0.0691 to 0.0585. A similar pattern is observed in the training set (Table~\ref{tab:train_lang}), where all three language specific values remain below those of V1. Since V2 metrics are inferior with respect to the baseline, it was necessary to continue the search of a better performing model.
+
+
+\subsection{V3 — Hybrid Asymmetric Search}
+
+V3 represents the first substantial improvement over the baseline system. In the development set, Table~\ref{tab:dev_macro} shows that average MRR@5 increases to 0.3913, with MAP reaching 0.4054 and NDCG@10 rising to 0.4277. Compared to V1 and V2, this is a clear breakthrough in all three metrics. The same result is confirmed by the training set, where V3 achieves the best scores among the evaluated runs: 
+MRR@5 = 0.3957, MAP = 0.4103, and NDCG@10 = 0.4318 (Table~\ref{tab:train_macro}). 
+\noindent The language results clarify where this achievement comes from, bringing to light that the gain is completely driven by the hybrid dense-sparse retrieval introduced. In the development set (Table~\ref{tab:dev_lang}), English matches V1 at 0.4910, while German and French improve significantly from 0.0968 to 0.2919 and from 0.0691 to 0.3910, respectively. The same behavior is observable in the training set (Table~\ref{tab:train_lang}), where English remains at 0.5028, while German increases to 0.2906 and French to 0.3937. The results obtained show that the new formulation highly improves the retrieval over German and French, achieving an overall better performance. Nevertheless, the gap between English and the other two languages suggested that the Max-P chunking strategy used was causing the fragmentation of the long semantic dependencies, justifying the search for another model.
+
+\subsection{V4 — SOTA Hybrid Architecture}
+
+V4 achieves the best results on the development set and represents the final retrieval system formulation. As shown in Table~\ref{tab:dev_macro}, it reaches an average MRR@5 of 0.4919, a MAP of 0.5038, and an NDCG@10 of 0.5298, outperforming all previous runs on every metric. In detail, the jump from V3 to V4 is remarkable, approximately gaining 10 percentage points over the three metrics.
+\noindent The per language results in Table~\ref{tab:dev_lang} show that V4 is also the most balanced system among the languages. English decreases a bit to 0.4898, which is really close to the best previous English results, while German increases to 0.4382 and French to 0.5476. Compared to V3, this means a substantial gain from 0.2919 to 0.4382 in German and from 0.3910 to 0.5476 in French. These results confirm that switching to \texttt{BAAI/bge-m3} and eliminating the Max-P chunking strategy (Section~\ref{subsec:methodology_v4}) was the key architectural decision to overcome the weakness related to the metrics' gap among the languages.
+
+
+\subsection{Results Tables}
+
+\vspace{1em}
+\noindent
+\begin{minipage}{\linewidth}
+\centering
+\captionof{table}{Averaged results on the development set.}
+\label{tab:dev_macro}
+\begin{tabularx}{\linewidth}{LCCC}
+\toprule
+\textbf{Run} & \textbf{MRR@5} & \textbf{MAP} & \textbf{NDCG@10} \\
+\midrule
+V4 — SOTA Hybrid (bge-m3 + CE)   & \textbf{0.4919} & \textbf{0.5038} & \textbf{0.5298} \\
+V3 — Hybrid Asymmetric (e5 + CE) & 0.3913          & 0.4054          & 0.4277          \\
+V1 — BM25 Baseline               & 0.2190          & 0.2322          & 0.2488          \\
+V2 — BM25 + PRF                  & 0.1892          & 0.2011          & 0.2185          \\
+\bottomrule
+\end{tabularx}
+\end{minipage}
+\vspace{1em}
+
+\vspace{1em}
+\noindent
+\begin{minipage}{\linewidth}
+\centering
+\captionof{table}{Per-language metrics result in the development set.}
+\label{tab:dev_lang}
+\begin{tabularx}{\linewidth}{LCCCC}
+\toprule
+\textbf{Run} & \textbf{EN} & \textbf{DE} & \textbf{FR} & \textbf{Avg} \\
+\midrule
+V4 — SOTA Hybrid (bge-m3 + CE)   & 0.4898          & \textbf{0.4382}          & \textbf{0.5476} & \textbf{0.4919} \\
+V3 — Hybrid Asymmetric (e5 + CE) & \textbf{0.4910} & 0.2919          & 0.3910          & 0.3913          \\
+V1 — BM25 Baseline               & \textbf{0.4910} & 0.0968          & 0.0691          & 0.2190          \\
+V2 — BM25 + PRF                  & 0.4285          & 0.0806          & 0.0585          & 0.1892          \\
+\bottomrule
+\end{tabularx}
+\end{minipage}
+\vspace{1em}
+
+\vspace{1em}
+\noindent
+\begin{minipage}{\linewidth}
+\centering
+\captionof{table}{Averaged results on the training set.}
+\label{tab:train_macro}
+\begin{tabularx}{\linewidth}{LCCC}
+\toprule
+\textbf{Run} & \textbf{MRR@5} & \textbf{MAP} & \textbf{NDCG@10} \\
+\midrule
+V3 — Hybrid Asymmetric (e5 + CE) & \textbf{0.3957} & \textbf{0.4103} & \textbf{0.4318} \\
+V1 — BM25 Baseline               & 0.2301          & 0.2437          & 0.2606          \\
+V2 — BM25 + PRF                  & 0.1971          & 0.2102          & 0.2284          \\
+\bottomrule
+\end{tabularx}
+\end{minipage}
+\vspace{1em}
+
+\vspace{1em}
+\noindent
+\begin{minipage}{\linewidth}
+\centering
+\captionof{table}{Per-language metrics result in the training set}
+\label{tab:train_lang}
+\begin{tabularx}{\linewidth}{LCCCC}
+\toprule
+\textbf{Run} & \textbf{EN} & \textbf{DE} & \textbf{FR} & \textbf{Avg} \\
+\midrule
+V3 — Hybrid Asymmetric (e5 + CE) & \textbf{0.5028} & \textbf{0.2906} & \textbf{0.3937} & \textbf{0.3957} \\
+V1 — BM25 Baseline               & \textbf{0.5028} & 0.0970          & 0.0904          & 0.2301          \\
+V2 — BM25 + PRF                  & 0.4377          & 0.0795          & 0.0742          & 0.1971          \\
+\bottomrule
+\end{tabularx}
+\end{minipage}
+\vspace{1em}
