@@ -1,14 +1,24 @@
 \section{Methodology}
 \label{sec:methodology}
+We developed these pipelines based on the knowledge gained during the course.
+This section describes the indexing and retrieval pipeline.  We first
+present the BM25 ranking model that underpins every version
+(\S\ref{sec:bm25}), then the document and query parsers
+(\S\ref{subsec:parsing}), the linguistic preprocessing
+(\S\ref{subsec:preprocessing}), and the indexing layer
+(\S\ref{subsec:indexing}).  The four iterative versions
+(V1\,–\,V4) are described in \S\ref{subsec:methodology_v1}\,–\,\S\ref{subsec:methodology_v4}.
 
-\textbf{Describe the methodology you have adopted, the architecture of your system, your workflow, etc.}
-\subsection{BM25 First-Stage Retrieval}
+
+% ======================================================================
+\subsection{BM25}
 \label{sec:bm25}
 
-The first retrieval stage uses BM25~\cite{Harman1994}, a probabilistic
-ranking function that extends the BIM (Binary Independence Model)~\cite{RobertsonSparckJones1976} with two
-components that BIM lacks: term-frequency (TF) saturation and document-length
-normalisation.  The full ranking function is
+Every version uses BM25~\citep{Harman1994,RobertsonEtAl1994}, a
+probabilistic ranking function that extends the Binary Independence
+Model~\citep{RobertsonSparckJones1976} with two components that the BIM
+lacks: \ac{TF} saturation and document-length normalisation.  The full
+ranking function is
 
 \begin{equation}
 R(q,d) \;\propto\;
@@ -30,172 +40,430 @@ R(q,d) \;\propto\;
 \end{equation}
 
 \noindent
-where $N$ is the number of documents in the collection; $n_i$ is the document
-frequency of term $i$; $R$ and $r_i$ are relevance feedback counts (set to zero
-in the absence of feedback); $f_i$ is the within-document frequency of term $i$;
-$qf_i$ is its frequency in the query; $dl$ is the document length in tokens;
-$avdl$ is the mean document length across the collection; and $k_1$, $b$, $k_2$
-are free parameters.
+where $N$ is the number of documents in the collection; $n_i$ is the
+document frequency of term $i$; $R$ and $r_i$ are relevance-feedback
+counts (zero in the absence of feedback); $f_i$ is the within-document
+frequency of term $i$; $qf_i$ is its frequency in the query; $dl$ is
+the document length in tokens; $avdl$ is the mean document length
+across the collection; and $k_1$, $b$, $k_2$ are free parameters.
 
 \paragraph{TF saturation ($k_1$).}
-The TF component is a sigmoid-like function of $f_i$ that saturates as $f_i$
-grows, approaching $(k_1+1)/k_1$ asymptotically.  This models the intuition
-that the first occurrence of a term is highly informative whereas the hundredth
-adds negligible evidence.  At $k_1=0$ the function reduces to pure IDF; as
-$k_1\!\to\!\infty$ it degenerates to raw, unsaturated TF.
+The TF component is a sigmoid-like function of $f_i$ that saturates as
+$f_i$ grows, approaching $(k_1+1)/k_1$ asymptotically.  This models
+the intuition that the first occurrence of a term is highly
+informative whereas the hundredth adds negligible evidence.  At
+$k_1=0$ the function reduces to pure IDF; as $k_1\!\to\!\infty$ it
+degenerates to raw, unsaturated TF.
 
 \paragraph{Length normalisation ($b$).}
-The factor $\bigl(1-b+b\,dl/avdl\bigr)$ penalises long documents, which
-naturally accumulate higher raw term frequencies regardless of relevance.
-Setting $b=0$ disables normalisation entirely; $b=1$ applies full
-normalisation by dividing TF by the relative document length.
+The factor $\bigl(1-b+b\,dl/avdl\bigr)$ penalises long documents,
+which naturally accumulate higher raw term frequencies regardless of
+relevance.  Setting $b=0$ disables normalisation entirely; $b=1$
+applies full normalisation by dividing TF by the relative document
+length.
 
 \paragraph{Query TF ($k_2$).}
 For standard keyword queries where each term appears exactly once
 ($qf_i=1$), the query-TF component reduces to $1$ and has no effect.
-It becomes relevant only when the query itself is derived from a document
-containing repeated terms.
+It becomes relevant only when the query is itself derived from a
+document containing repeated terms.
 
+% ======================================================================
+\subsection{Document and Query Parsing}
+\label{subsec:parsing}
 
-\subsection{V1: Lexical Baseline and Probabilistic Retrieval}
-\label{subsec:methodology_v1}
-Our foundational pipeline (V1) relied exclusively on exact keyword 
-matching via Apache Lucene, utilizing the BM25 probabilistic scoring model. 
+Documents and queries are parsed through dedicated classes that
+implement the Python iterator protocol, so the system processes the
+files sequentially without loading the whole collection into memory.
+
+\subsubsection{Document Parsing}
+The \texttt{JsonArrayDocumentParser} reads the corpus in batches of
+$500$ JSONL records.  For each record, the title and abstract are
+concatenated and passed to the \texttt{langdetect}
+library~\citep{Shuyo2010} to obtain a language code.  Codes outside
+$\{\texttt{en},\texttt{fr},\texttt{de}\}$, together with inputs that
+raise \texttt{LangDetectException} on very short or noisy text, are
+mapped to a single \texttt{other} bucket.  Determinism is enforced by
+setting \texttt{DetectorFactory.seed = 0}, so repeated runs over the
+same collection produce identical labels.  Each parsed record is
+wrapped in a \texttt{ParsedDocument} carrying the document identifier,
+title, abstract, and detected language; the language label is later
+consumed by the indexer to route the document to the appropriate
+per-field analyser (\S\ref{subsec:indexing}).
+
+\subsubsection{Query Parsing}
+Queries are parsed by \texttt{JsonArrayQueryParser}, mirroring the
+batched-iterator pattern of the document parser.  Because the queries
+are social-media tweets rather than scientific articles, a cleaning
+step is applied before any retrieval logic: user mentions
+(\texttt{@handle}) are stripped and the
+hashtag character is removed but the term itself is preserved,
+the leading numeric prefix of enumerated tweets (e.g.\ \texttt{1)\,},
+\texttt{2/\,}) is dropped, and the Lucene-reserved tokens
+\texttt{AND}/\texttt{OR}/\texttt{NOT} are lowercased so that an
+upper-case sentence opener does not crash the query parser.
+Alphanumeric characters and a small set of essential punctuation
+(period, comma, hyphen, parentheses, percent sign) are kept; everything
+else is removed.
+
+Unlike documents, queries are not passed through \texttt{langdetect}: the dataset partitions tweets per language \textit{a priori}, and the language code is read directly from the file name (\texttt{en\_dev.jsonl}, \texttt{de\_dev.jsonl},
+\texttt{fr\_dev.jsonl}).
+
+% ======================================================================
+\subsection{Linguistic Preprocessing}
+\label{subsec:preprocessing}
+
+All linguistic preprocessing, for both documents and queries, is
+delegated to Apache Lucene analysers~\citep{McCandlessEtAl2010},
+wrapped in a \texttt{PerFieldAnalyzerWrapper} so that each
+(title/abstract, language) field receives its own analysis chain:
+
 \begin{itemize}
-    \item \textbf{Theoretical Foundation :}(This can be \textbf{replaced/integrated}
-    with configuration) BM25 improves upon standard TF-IDF 
-    by introducing term frequency saturation and document length normalization. 
-    Given the dense nature of scientific and medical abstracts, we calibrated 
-    the parameters to $k_1=0.9$ and $b=0.8$. This calibration strictly limits 
-    the relevance of repeated acronyms, preventing long documents from being 
-    penalized while avoiding term saturation.
-    \item \textbf{Multilingual Indexing:} To preserve complex medical terminology
-    and hyphenated compounds, we indexed documents using native language-specific analyzers
-    (\texttt{EnglishAnalyzer}, \texttt{FrenchAnalyzer}, \texttt{GermanAnalyzer})
-    rather than generic NLP tokenizers (we tried with a first tokenizer). 
-    \item \textbf{The Bottleneck:} While this baseline performs well for English queries,
-    where the vocabulary is standardized, it suffers from an important vocabulary mismatch
-     for cross-lingual tasks (that includes French and German). The main issue of Lexical models
-     is that they fail when query terms lack exact character-level translations in the target documents.
+  \item \textbf{\texttt{EnglishAnalyzer}} — Unicode tokenisation,
+    lowercase conversion, English possessive stripping, English
+    stopword removal, and Porter stemming~\citep{Porter1980}.
+  \item \textbf{\texttt{FrenchAnalyzer}} — elision filtering
+    (\textit{l'}, \textit{d'}, \ldots), lowercase conversion, French
+    stopword removal, and the French light stemmer.
+  \item \textbf{\texttt{GermanAnalyzer}} — lowercase conversion,
+    German stopword removal, normalisation of umlauts and \textit{\ss},
+    and the German light stemmer.
+  \item \textbf{\texttt{StandardAnalyzer}} — Unicode-aware
+    tokenisation, lowercase conversion, and removal of the default
+    English stopword set; used as a typed-but-language-agnostic
+    fallback for documents whose detected language is neither English,
+    French, nor German (e.g.\ Italian or Spanish).
 \end{itemize}
 
-%this can be moved here:
+Using the same analyser at both index time and query time ensures that
+identical surface forms map to identical indexed terms on both sides
+of the inverted-index lookup, which is essential for stemmed languages
+such as German where the surface form and the stem can differ
+substantially.
+
+\paragraph{Discarded alternative: a hand-rolled NLTK pipeline.}
+An earlier preprocessing variant relied on a custom
+\texttt{TextProcessor} class layered on top of
+NLTK~\citep{BirdLoper2004}.  HTML tags were stripped with
+\texttt{re.sub(r'<[\textasciicircum>]+>', '', text)}; tokens were
+extracted with to retain alphanumerics, percentages and hyphenated compounds such as
+\textit{SARS-CoV-2}; stopwords were removed with NLTK's per-language
+lists; and stems were produced by NLTK's Snowball
+implementation~\citep{Porter2001Snowball}.  We abandoned this pipeline
+for two reasons.  First, executing the analysis in Python at index
+time and again at query time made it difficult to guarantee
+bit-identical token streams on the two sides, risking subtle
+index/query mismatches.  Second, in pilot runs against the dev split
+it was strictly less effective than the Lucene-analyser configuration
+above, while introducing an additional external dependency.
+
+% ======================================================================
+\subsection{Indexing}
+\label{subsec:indexing}
+
+The collection is indexed by \texttt{DirectoryIndexer}, a Python class
+that walks the corpus directory and feeds qualifying files through
+\texttt{JsonArrayDocumentParser}.  A whitelist parameter
+(\texttt{include\_files = \{collection.jsonl\}}) restricts the walk to
+the document file proper, so the topic and query files which share
+the same folder and \texttt{.jsonl} extension are skipped rather than
+mis-indexed as documents.
+
+\subsubsection{Field schema}
+Each \texttt{ParsedDocument} is converted into a Lucene
+\texttt{Document} carrying four fields:
+
+\begin{itemize}
+  \item \texttt{id} — \texttt{StringField} (not analysed, stored).
+    Persists the original \texttt{pubkey} so retrieved hits can be
+    written into the TREC run file.
+  \item \texttt{lang} — \texttt{StringField} (not analysed, stored).
+    Persists the language label assigned at parse time.
+  \item \texttt{title\_\textlangle lang\textrangle} and
+    \texttt{abstract\_\textlangle lang\textrangle} — typed text
+    fields carrying the document body.  The language suffix routes
+    each document to the analyser configured for its language; e.g.\
+    a record labelled \texttt{de} populates only \texttt{title\_de}
+    and \texttt{abstract\_de}, leaving the remaining language fields
+    empty.  This per-language fan-out lets the English-, French-, and
+    German-specific analysis chains coexist inside a single index.
+\end{itemize}
+
+The text fields share a singleton \texttt{FieldType} configured with
+\texttt{DOCS\_AND\_FREQS\_AND\_POSITIONS}, tokenisation
+enabled, and the original text stored.  Storing positions enlarges
+the index by approximately $15\text{--}20\,\%$ but is required to
+support phrase and proximity queries (\textit{``machine learning''});
+storing the raw text supports stored-field retrieval in the
+cross-encoder re-ranking stages of V3 and V4.
+
+\subsubsection{Scoring and writer configuration}
+The \texttt{IndexWriter} is configured with BM25 similarity
+($k_1=0.9$, $b=0.8$; see \S\ref{sec:bm25}), a $256$-MB RAM buffer,
+\texttt{OpenMode.CREATE} (so each indexing run starts from scratch),
+\texttt{commitOnClose=true}, and compound files disabled to keep
+segment inspection straightforward.  Indexing the $10{,}000$-document
+collection completed in under one minute on the Docker-hosted CPU
+configuration described in \S\ref{sec:setup}.
+
+\subsubsection{Dense companion index}
+\label{subsubsec:faiss-index}
+For the hybrid pipelines (V3, V4) a second indexer in
+\texttt{index\_faiss.py} runs alongside the Lucene indexer and
+produces a FAISS-backed dense index~\citep{JohnsonDouzeJegou2021}
+over the same collection.  Each title and abstract is concatenated
+into a single \texttt{title.\,abstract} string, embedded by a
+sentence-transformer encoder (\texttt{BAAI/bge-m3}~\citep{ChenEtAl2024BGEM3}
+for V4, \texttt{intfloat/multilingual-e5-base}~\citep{WangEtAl2024E5}
+for V3, configurable via the \texttt{FAISS\_MODEL} environment
+variable), $\ell_2$-normalised, and added to a flat inner-product
+index (\texttt{faiss.IndexFlatIP}).  Because the vectors are
+$\ell_2$-normalised, inner-product search on this index is
+mathematically equivalent to cosine-similarity search.  Two artefacts
+are written next to the Lucene segments: \texttt{corpus.faiss} (the
+serialised FAISS index) and \texttt{doc\_ids.json} (the parallel list
+of document identifiers needed to map FAISS row indices back to
+Lucene's \texttt{id} field).  Embedding is performed in batches of
+four documents to bound peak GPU memory at the precision (FP16) and
+dimensionality ($1024$ for bge-m3) used in V4.
+
+% ======================================================================
+\subsection{V1: Lexical Baseline and Probabilistic Retrieval}
+\label{subsec:methodology_v1}
+
+The foundational pipeline (V1, \autoref{fig:v1-pipeline}) relied
+exclusively on exact keyword matching via Apache Lucene and the BM25
+probabilistic scoring model.
+
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=0.95\linewidth]{figure/02-figure_v1-diagram.png}
+  \caption{V1 — full pipeline.  \emph{Top:} offline corpus path
+    (responsible: \texttt{index.py}), \texttt{collection.jsonl}
+    $\to$ \texttt{JsonArrayDocumentParser} (with deterministic
+    \texttt{langdetect}) $\to$ \texttt{ParsedDocument} $\to$
+    \texttt{DirectoryIndexer} (per-field analysers, BM25 scoring)
+    $\to$ a single Lucene index.  \emph{Bottom:} online query path
+    (responsible: \texttt{search.py}), tweet $\to$
+    \texttt{JsonArrayQueryParser} $\to$ \texttt{ParsedQuery} $\to$
+    tweet cleaning + the same per-field analyser $\to$ BM25 search.
+    The Lucene index links the two halves of the pipeline.}
+  \label{fig:v1-pipeline}
+\end{figure}
+
 \paragraph{Configuration.}
 We set $k_1=0.9$ and $b=0.8$, departing slightly from the commonly
-reported defaults of $1.2$ and $0.75$.  The lower $k_1$ increases TF
-saturation speed, reducing the influence of high-frequency terms in
+reported defaults of $1.2$ and $0.75$.  The lower $k_1$ accelerates
+TF saturation, reducing the influence of high-frequency terms in
 scientific abstracts (e.g.\ domain-specific verbs that recur heavily
 but carry little discriminative power).  The higher $b$ strengthens
 length normalisation, which is appropriate for a collection in which
-document length varies considerably between short news-style abstracts
-and full structured abstracts.  The query-TF parameter $k_2$ is not
-exposed by Lucene's \texttt{BM25Similarity} implementation; the
-component is effectively fixed at $k_2\!\to\!\infty$, giving raw
-query TF, but since every query term appears at most once in our
-setting this has no practical effect.
+document length varies considerably between short news-style
+abstracts and full structured abstracts.  The query-TF parameter
+$k_2$ is not exposed by Lucene's \texttt{BM25Similarity}
+implementation; the component is effectively fixed at
+$k_2\!\to\!\infty$, giving raw query TF, but since every query term
+appears at most once in our setting this has no practical effect.
 
-BM25 scoring is computed by Apache Lucene's \texttt{BM25Similarity},
-which applies per-field language-specific analysers (English, French,
-German, and a \texttt{StandardAnalyzer} fallback for other languages)
-before indexing and query processing, ensuring that stemming and
-stop-word removal operate in the correct morphological context for
-each field.
+\paragraph{Multilingual Indexing.}
+To preserve complex medical terminology and hyphenated compounds, we
+indexed documents using native language-specific analysers
+(\texttt{EnglishAnalyzer}, \texttt{FrenchAnalyzer},
+\texttt{GermanAnalyzer}) rather than a generic tokeniser; an early
+NLTK-based variant was discarded for the reasons given in
+\S\ref{subsec:preprocessing}.  BM25 scoring is computed by Apache
+Lucene's \texttt{BM25Similarity}, which applies the per-field
+language-specific analysers (English, French, German, and a
+\texttt{StandardAnalyzer} fallback for other languages) before
+indexing and query processing, ensuring that stemming and stopword
+removal operate in the correct morphological context for each field.
 
+\paragraph{The Bottleneck.}
+While this baseline performs well for English queries, where the
+vocabulary is standardised, it suffers from a substantial vocabulary
+mismatch on cross-lingual tasks (French and German).  Lexical models
+fail when query terms lack exact character-level translations in the
+target documents, motivating the experiments that follow.
+
+% ======================================================================
 \subsection{V2: Statistical Query Expansion via Pseudo-Relevance Feedback}
 \label{subsec:methodology_v2}
-To bridge the vocabulary gap without introducing external neural models, our second
-iteration (V2) explored a statistical expansion technique known as \ac{PRF}.
-\begin{itemize}
-    \item \textbf{Mechanism:} PRF assumes that the initial top-$k$ retrieved documents are highly relevant. 
-    The system retrieved the top 3 documents, merged their multilingual text fields, and returned the 5 most frequent terms,
-    applying stopword removal techniques with its multilingual stopwords list.
-    These terms were then appended to the original query as a \texttt{SHOULD} clause to proactively expand the search vocabulary.
-    \item \textbf{Theoretical Limitation (Topic Drift):} While the concept behind this theory seemed very promising,
-    empirical observation showed high susceptibility to topic drift. When the initial retrieval was marginally inaccurate,
-    the statistically extracted terms shifted the semantic focus away from what the user had been looking for.
-    Due to the high precision required in the medical domain, this purely statistical expansion proved to be unsuitable.
-\end{itemize}
 
+To bridge the vocabulary gap without introducing external neural
+models, the second pipeline (V2, \autoref{fig:v2-pipeline}) explored
+a statistical expansion technique known as Pseudo-Relevance
+Feedback~\citep{LavrenkoCroft2001}.
+
+
+
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=0.95\linewidth]{figure/03-figure_v2-diagram.png}
+  \caption{V2 — full pipeline.  Same offline indexing as V1; the
+    online query path adds an intermediate BM25 pass over the top-3
+    documents to extract the five most frequent multilingual content
+    words, which are appended as a \texttt{SHOULD} clause to the
+    original query before a second BM25 pass.}
+  \label{fig:v2-pipeline}
+\end{figure}
+
+\paragraph{Mechanism.}
+PRF assumes that the initial top-$k$ retrieved documents are highly
+relevant.  The system retrieves the top-3 documents from a first
+BM25 pass, merges their multilingual title and abstract fields, and
+selects the five most frequent content terms after stopword removal
+against a curated multilingual list.  These terms are then appended
+to the original query as a \texttt{SHOULD} clause to expand the
+search vocabulary while the original query is kept as a
+\texttt{MUST} constraint.
+
+\paragraph{Theoretical Limitation.}
+As discussed in \S\ref{sec:results}, the technique is highly
+susceptible to topic drift.  When the initial retrieval is even
+marginally inaccurate, the statistically extracted terms shift the
+semantic focus away from the user's intent.  Given the high precision
+required in the medical domain, this purely statistical expansion
+proved unsuitable.
+
+% ======================================================================
 \subsection{V3: Hybrid Asymmetric Search and Semantic Re-ranking}
 \label{subsec:methodology_v3}
-Taking into consideration the lessons from V2, our third experiment (V3) moved from statistical expansion to a Deep Learning approach, with the intent to capture the true semantic. We adopted an asymmetric architecture that ensures high-precision reranking with computational efficiency.
-\begin{itemize}
-    \item \textbf{Hybrid Candidate Pooling:} To resolve the "Retrieval Bottleneck" identified in V1 where relevant cross-lingual documents were not retrieved by BM25, \textbf{FAISS} (Facebook AI Similarity Search) was implementsd to perform dense retrieval. For French and German queries, the system merges candidates from BM25 with those from a dense search using the \texttt{intfloat/multilingual-e5-base} model, in order to add semantically relevant documents to the pipeline even if they lack exact keyword overlap.
-    \item \textbf{Neural Re-ranking (Cross-Encoder):} The scoring is performed on the joined candidate pool using a Transformer-based Cross-Encoder (\texttt{cross-encoder/mmarco-mMiniLMv2-L12-H384-v1}). Unlike Bi-Encoders, the Cross-Encoders compute full self-attention on the concatenated query and document, allowing for deep, word-level semantic interactions, which are crucial for cross-lingual understanding.
-    \item \textbf{Max-P Chunking Strategy:} To avoid the 512-token context limit of the selected neural models and preserve all information about the longer abstracts, we adopted a sliding-window strategy. Documents are partitioned into independent chunks of 250 words with a 50-word overlap. The final relevance score is computed via \textbf{Max-P Aggregation}, where only the highest-scoring chunk represents the document.
-    \item \textbf{Asymmetric Optimization:} Given the existing robustness of the lexical engine for English, English queries do not go through the neural pipeline and follow a fast BM25 path. This preserves computational resources for the more challenging French and German cross-lingual tasks.
-    \item \textbf{Tail Padding Integrity:} To preserve the standard Recall@1000, documents retrieved by BM25 but not selected for re-ranking are appended to the final results. Such documents receive penalized scores using the formula $score=-1000.0-rank$, which helps to prevent the “tail” from disturbing the neural “head.”
-\end{itemize}
 
+Drawing on the limits of the previous pipelines, the third
+experiment (V3, \autoref{fig:v3-pipeline}) moved from statistical
+expansion to a deep-learning approach intended to capture semantic
+similarity through embeddings.  We adopted an asymmetric pipeline
+that combines high-precision re-ranking with computational
+efficiency.
+
+
+
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=0.99\linewidth]{figure/04-figure_v3-diagram.png}
+  \caption{V3 — full pipeline.  Two parallel \texttt{DirectoryIndexer}
+    runs over the same \texttt{ParsedDocument} stream produce a
+    Lucene inverted index and a FAISS dense index (\texttt{e5-base},
+    $\ell_2$-normalised) sharing identifiers via
+    \texttt{doc\_ids.json}.  English queries follow a fast BM25-only
+    path; French and German queries fuse BM25 and dense candidates,
+    chunk long abstracts to fit the 512-token cross-encoder, and
+    aggregate per document via Max-P.  The BM25 tail pads the
+    positions beyond the rerank pool.}
+  \label{fig:v3-pipeline}
+\end{figure}
+
+\paragraph{Hybrid Candidate Pooling.}
+To resolve the retrieval bottleneck identified in
+\S\ref{subsec:methodology_v1} — relevant cross-lingual documents
+that BM25 fails to retrieve — we implemented dense retrieval over
+FAISS~\citep{JohnsonDouzeJegou2021}.  For French and German queries,
+the system merges BM25 candidates with those from a dense search
+that uses the \texttt{intfloat/multilingual-e5-base}
+encoder~\citep{WangEtAl2024E5}, recovering documents that share
+meaning with the query but have no surface-vocabulary overlap.
+
+\paragraph{Neural Re-ranking (Cross-Encoder).}
+Scoring on the merged candidate pool is performed by a
+Transformer-based cross-encoder
+(\texttt{cross-encoder/mmarco-mMiniLMv2-L12-H384-v1})~\citep{BonifacioEtAl2021mMARCO,
+NogueiraCho2019monoBERT}.  Unlike the bi-encoder used for first-stage
+dense retrieval, which encodes query and document independently, the
+cross-encoder concatenates them and applies full self-attention,
+allowing deep word-level semantic interactions that are critical for
+cross-lingual understanding.
+
+\paragraph{Max-P Chunking Strategy.}
+To respect the $512$-token context limit of this cross-encoder while
+preserving the information in longer abstracts, we adopted a
+sliding-window strategy.  Documents are partitioned into chunks of
+$250$ words with a $50$-word overlap; each chunk is scored
+independently, and the document's final score is the maximum across
+its chunks (\textit{Max-P} aggregation~\citep{DaiCallan2019DeeperText}).
+
+\paragraph{Asymmetric Optimisation.}
+Given the existing strength of the lexical engine on English, English
+queries bypass the neural pipeline and follow a fast BM25 path.  This
+preserves computational budget for the harder French and German
+cross-lingual tasks.
+
+\paragraph{Tail Padding Integrity.}
+To preserve the standard Recall@1000, documents retrieved by BM25 but
+not selected for re-ranking are appended to the final results.  These
+tail documents receive penalised scores using the formula
+$\mathit{score} = -1000 - \mathit{rank}$, which prevents the
+score-based sort used by evaluation toolkits from promoting tail
+entries above the cross-encoder's reranked head.
+
+% ======================================================================
 \subsection{V4: Architecture with Long-Context Embeddings}
 \label{subsec:methodology_v4}
-Although V3 successfully solved the cross-lingual vocabulary gap, the chunking strategy introduced computational burden and the possibility of breaking down long-range semantic dependencies. Our final iteration (V4) optimized the hybrid pipeline by replacing the neural backbone to state-of-the-art neural models designed for long documents.
-\begin{itemize}
-    \item \textbf{Eliminating Chunking (BGE-M3):} In particular, we replaced the base embedding models with \texttt{BAAI/bge-m3}, a state-of-the-art model that supports a massive context window of up to 8192 tokens. It helped us to eliminate both information loss and additional architectural complexity of the sliding window mechanism since we encoded the full abstract in one step.
-    \item \textbf{Unified High-Dimensional Space:} Increasing the dimensionality from 512 to 1024, provided the system much more expressive semantic representation, which enhanced the first dense retrieval phase for German and French queries, providing a higher-quality candidate pool for the re-ranker.
-    \item \textbf{Refined Hybrid Integrity:} Asymmetric routing is preserved in V4 along with the tail-padding strategy introduced in V3. The combination of long-context dense retrieval, exact-match lexical backup, and protected evaluation integrity represents our most robust and effective architecture for cross-lingual clinical retrieval.
-\end{itemize}
-% Alberto
-\subsection{Document and Query Parsing}
 
-Documents and queries are parsed through dedicated classes that implement
-the Python iterator protocol, allowing the system to process the files sequentially without loading the whole collection into memory in one step.
+Although V3 successfully addressed the cross-lingual vocabulary gap,
+the chunking strategy added engineering complexity and risked
+breaking long-range semantic dependencies.  The final iteration
+(V4, \autoref{fig:v4-pipeline}) optimised the hybrid pipeline by
+upgrading both neural components to long-context, retrieval-tuned
+state-of-the-art models.
 
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=0.95\linewidth]{figure/05-figure_v4-diagram.png}
+  \caption{V4 — full pipeline.  Indexing layout matches V3, but the
+    FAISS side now stores $1024$-dimensional bge-m3 embeddings.  At
+    query time the chunking and Max-P stages of V3 are removed: the
+    upgraded cross-encoder \texttt{bge-reranker-v2-m3} accepts up to
+    $1024$ tokens and accommodates nearly all abstracts in a single
+    forward pass.}
+  \label{fig:v4-pipeline}
+\end{figure}
 
+\paragraph{Long-Context Bi-Encoder (BGE-M3).}
+We replaced the dense encoder with
+\texttt{BAAI/bge-m3}~\citep{ChenEtAl2024BGEM3}, a retrieval-tuned
+multilingual model with a context window of up to $8192$ tokens.
+The window is far larger than any abstract in the collection, so
+each document is now encoded in a single pass on the FAISS side,
+removing both information loss and the architectural complexity of
+the sliding-window mechanism.
 
-\subsubsection{Document Parsing}
-The \texttt{JsonArrayDocumentParser} reads the data collection in sets of
-500 documents. For each document, the title and abstract are concatenated together and passed to the \texttt{langdetect} library to assign a language label (\texttt{en}, \texttt{de}, \texttt{fr}, or \texttt{other}).
-Each document in the collection is coded as a \texttt{ParsedDocument} object
-carrying its ID, title, abstract, and detected language (which will be later used to determine the analyzer in the indexing phase).
+\paragraph{Long-Context Cross-Encoder (BGE-Reranker-v2-m3).}
+The cross-encoder was upgraded to
+\\ \texttt{BAAI/bge-reranker-v2-m3}~\citep{ChenEtAl2024BGEM3}, which
+accepts up to $1024$ tokens per (query, document) pair, twice the
+budget of the V3 reranker.  Because nearly all abstracts fit within
+$1024$ reranker tokens, V4 removes the chunking and Max-P stages of
+V3 entirely.  The chunking removal is therefore driven by the
+\emph{cross-encoder} upgrade, not by the bi-encoder's $8192$-token
+window, which only governs first-stage dense retrieval.
 
-\subsubsection{Query Parsing}
-Queries are parsed by the \texttt{JsonArrayQueryParser}, which follows the
-same pattern built for document parsing. Since being social media tweets and not scientific paper as in the case of the documents, queries are "cleaned":
-mentions, URLs, and hashtag symbols are removed while alphanumeric content and essential punctuation are kept. 
-Moreover, the \texttt{extract\_entities()} method scans each quary looking for the presence of scientific journal names from \texttt{journals.txt};
-if the match has a positive correspondence, in searching phase documents published on that journal will get a boost.
-An important difference to bring to light regarding the language detection: queries are partitioned for language, hence no language tag is assigned to them.
+\paragraph{Unified High-Dimensional Space.}
+The dense embedding dimensionality grew from $768$ (e5-base) to
+$1024$ (bge-m3), giving the first dense-retrieval stage a richer
+semantic representation and a higher-quality candidate pool for the
+re-ranker on French and German queries.
 
+\paragraph{Refined Hybrid Integrity.}
+Asymmetric routing is preserved in V4 along with the tail-padding
+strategy introduced in V3.  The combination of long-context dense
+retrieval, exact-match lexical backup, and protected evaluation
+integrity constitutes the most robust configuration we evaluated for
+cross-lingual scientific-claim retrieval.
 
-\subsection{Data Preprocessing}
-The linguistic textual preprocessing, both for documents and queries, is executed through the Lucene's built-in analyzers:
-\begin{itemize}
-    \item \texttt{EnglishAnalyzer} — tokenization, lowercase conversion, English stopword removal, and Porter stemming
-    \item \texttt{GermanAnalyzer} — tokenization, lowercase conversion, 
-German stopword removal, and Snowball stemming
-    \item \texttt{FrenchAnalyzer} — tokenization, lowercase conversion, 
-French stopword removal, and French light stemming
-    \item \texttt{StandardAnalyzer} — tokenization and lowercase 
-    conversion only, used as a fallback for other languages with no query correspondence (Italian and Spanish)
-\end{itemize}
-
-\subsubsection{Regular Expressions}
-The very first textual preprocessing applied was "manually" built since relied on:
-\begin{itemize}
-    \item lowercase conversion to ensure case-insensitive matching.
-    \item regular expression for tokenization and HTML tag removal. In detail \texttt{re.sub(r'<[{\textasciicircum}]+>', '', text)} 
-    to strip HTML tags and \texttt{RegexpTokenizer(r'[A-Za-z0-9\%\textbackslash.\textbackslash-]+')} 
-    to extract only alphanumeric tokens, percentages, and hyphenated 
-    compounds such as \textit{SARS-CoV-2}.
-    \item the NLTK library for Snowball stemming and stopword removal
-\end{itemize}
-
-This approach was discarded because of two reasons, the first one related to the risk of mismatching between document and query indexing, and - more importantly - the run score 
-obtained with the manual approach was less effective than those achieved using Lucene's analyzers.
-
-An early preprocessing approach explored during development relied on 
-a custom \texttt{TextProcessor} class built on top of NLTK. For each 
-document or query, the pipeline applied HTML tag removal via regular 
-expressions, tokenisation through a \texttt{RegexpTokenizer} 
-(\texttt{[A-Za-z0-9\%\textbackslash.\textbackslash-]+}), stopword 
-removal, and Snowball stemming — all handled explicitly in Python for 
-English, French, and German.
-
-
-
-
+% ======================================================================
 \subsection{Embeddings}
-As mentioned previously, our information retrieval pipeline built exploits embeddings. To clarify how the are used it is necessary to make a  distinction between \textbf{sparse} and \textbf{dense} embeddings. 
-\textit{Sparse} embeddings are high-dimensional vectors in which the majority of elements are 0, making them computationally lightweight. These vectors do not catch any sentence meaning, and therefore they are suitable for exact-matching task. On the other hand, \textit{Dense} embeddings are low-dimensional vectors, where each dimension carries a fragment of semantic meaning. In detail, the contextual embeddings created with the model
-paraphrase-multilingual-MiniLM-L12-v2 are \textit{contextual}, allowing the retrieval of information that goes beyond the "vocabulary mismatch".
+\label{subsec:embeddings}
+
+The retrieval pipelines exploit two complementary families of
+embeddings.  \emph{Sparse} embeddings are high-dimensional vectors
+in which the majority of entries are zero — concretely, the
+inverted-index posting lists exposed by Lucene.  They are
+computationally lightweight and excel at exact-match retrieval, but
+do not encode sentence-level meaning.  \emph{Dense} embeddings are
+low-dimensional, contextual vectors in which each dimension carries
+a fragment of semantic meaning, computed by transformer encoders
+trained for retrieval (\texttt{multilingual-e5-base} in V3,
+\texttt{bge-m3} in V4).  Because dense vectors place semantically
+similar documents close together regardless of surface form, they
+recover relevant documents that lexical retrieval misses, narrowing
+the cross-lingual vocabulary gap that motivates V3 and V4.
