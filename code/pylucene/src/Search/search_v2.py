@@ -49,6 +49,7 @@ MULTILINGUAL_STOPWORDS = set([
 
 # Initialize PyLucene
 assert lucene.getVMEnv() or lucene.initVM(), "Lucene version not available"
+import argparse
 
 class Searcher:
     """
@@ -192,7 +193,12 @@ class Searcher:
 
 # main
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--split", choices=["train", "dev", "test"], default="dev", help="Dataset split to evaluate")
+    args = parser.parse_args()
     
+    current_split = args.split
+
     # 1. Define all absolute paths
     SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
     INDEX_PATH = os.path.abspath(os.path.join(SCRIPT_DIR, "..", "..", "experiment", "index"))
@@ -201,7 +207,7 @@ if __name__ == "__main__":
 
     similarity = BM25Similarity(0.9, 0.8)
 
-    # Per-field analyzers — must mirror index.py exactly
+    # Per-field analyzers
     analyzer_map = HashMap()
 
     analyzer_map.put(f"{ParsedDocument.FIELDS.TITLE}_en",       EnglishAnalyzer())
@@ -212,44 +218,43 @@ if __name__ == "__main__":
 
     analyzer_map.put(f"{ParsedDocument.FIELDS.TITLE}_de",       GermanAnalyzer())
     analyzer_map.put(f"{ParsedDocument.FIELDS.ABSTRACT}_de",    GermanAnalyzer())
-
-    # _other fields (langdetect fallback) must match index.py
+    # added
     analyzer_map.put(f"{ParsedDocument.FIELDS.TITLE}_other",    StandardAnalyzer())
     analyzer_map.put(f"{ParsedDocument.FIELDS.ABSTRACT}_other", StandardAnalyzer())
 
     multi_analyzer = PerFieldAnalyzerWrapper(StandardAnalyzer(), analyzer_map)
 
+    current_run_id = f"run-V2_{current_split}"
+
     engine = Searcher(
         analyzer=multi_analyzer,
         similarity=similarity,
         index_path=INDEX_PATH,
-        run_id="run-V2_train",
+        run_id=current_run_id,
         run_path=RUNS_PATH,
-        max_docs_retrieved=1000
+        max_docs_retrieved=1000  # standard: top 1000
     )
 
-    # Queries to process. Switch _train ↔ _dev ↔ _test to change split.
-    
-    tasks = [
-        {"file": "en_train.jsonl", "lang": "en", "expected": 14977},
-        {"file": "de_train.jsonl", "lang": "de", "expected": 1460},
-        {"file": "fr_train.jsonl", "lang": "fr", "expected": 2807},
-    ]
+    # Define the batches of queries to process
+    ALL_TASKS = {
+        "train": [
+            {"file": "en_train.jsonl", "lang": "en", "expected": 14977},
+            {"file": "de_train.jsonl", "lang": "de", "expected": 1460},
+            {"file": "fr_train.jsonl", "lang": "fr", "expected": 2807},
+        ],
+        "dev": [
+            {"file": "en_dev.jsonl",  "lang": "en", "expected": 3905},
+            {"file": "de_dev.jsonl",  "lang": "de", "expected": 386},
+            {"file": "fr_dev.jsonl",  "lang": "fr", "expected": 702},
+        ],
+        "test": [
+            {"file": "final_en_test.jsonl", "lang": "en", "expected": 6080},
+            {"file": "final_de_test.jsonl", "lang": "de", "expected": 876},
+            {"file": "final_fr_test.jsonl", "lang": "fr", "expected": 1220},
+        ]
+    }
 
-    '''
-    tasks = [
-        {"file": "en_dev.jsonl", "lang": "en", "expected": 3905},
-        {"file": "de_dev.jsonl", "lang": "de", "expected": 386},
-        {"file": "fr_dev.jsonl", "lang": "fr", "expected": 702},
-    ]'''
-
-    '''  
-    tasks = [
-        {"file": "final_en_test.jsonl", "lang": "en", "expected": 6080},
-        {"file": "final_de_test.jsonl", "lang": "de", "expected": 876},
-        {"file": "final_fr_test.jsonl", "lang": "fr", "expected": 1220},
-    ]'''
-
+    tasks = ALL_TASKS[current_split]
     try:
         for task in tasks:
             file_path = os.path.join(DATA_FOLDER, task["file"])
@@ -264,4 +269,4 @@ if __name__ == "__main__":
 
     finally:
         engine.close()
-        print(f"\n All Searching Complete! Results saved to {RUNS_PATH} ####")
+        print(f"\nSearching Complete")

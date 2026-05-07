@@ -34,8 +34,8 @@ def main():
     do_index = input("(y/n): ").strip().lower() == 'y'
 
     print("\n[B] Which split do you want to run the search on?")
-    print(" - 'train': To test on the training set (evaluate metrics for the report)")
-    print(" - 'dev'  : To test on the validation set (evaluate metrics for tuning)")
+    print(" - 'train': To test on the training set (evaluate metrics available)")
+    print(" - 'dev'  : To test on the validation set (evaluate metrics available)")
     print(" - 'test' : To generate the final run for submission (NO local evaluation)")
     split_choice = input("(train/dev/test): ").strip().lower()
     
@@ -48,20 +48,20 @@ def main():
     # Automatic Mapping of Scripts and Output files
     if choice == '1':
         index_script = ["python", "src/Index/index.py"]
-        search_script = ["python", "src/Search/search_v1.py"]
+        search_script = ["python", "src/Search/search_v1.py", "--split", split_choice]
         run_filename = f"run-v1_{split_choice}.txt"
     elif choice == '2':
         index_script = ["python", "src/Index/index.py"]
-        search_script = ["python", "src/Search/search_v2.py"]
+        search_script = ["python", "src/Search/search_v2.py", "--split", split_choice]
         run_filename = f"run-v2_{split_choice}.txt"
     elif choice == '3':
         index_script = ["python", "src/Index/index_faiss.py"]
-        search_script = ["python", "src/Search/search_v3.py"]
+        search_script = ["python", "src/Search/search_v3.py", "--split", split_choice]
         current_env["FAISS_MODEL"] = "intfloat/multilingual-e5-base"
         run_filename = f"run-V3_{split_choice}.txt"
     elif choice == '4':
         index_script = ["python", "src/Index/index_faiss.py"]
-        search_script = ["python", "src/Search/search_v4.py"]
+        search_script = ["python", "src/Search/search_v4.py", "--split", split_choice]
         current_env["FAISS_MODEL"] = "BAAI/bge-m3"
         run_filename = f"run-V4_{split_choice}.txt"
 
@@ -84,7 +84,7 @@ def main():
             print("\n--- PHASE 3: METRICS EVALUATION ---")
             run_path = f"experiment/runs/{run_filename}"
             # Passa in automatico al valutatore il flag --split train o --split dev
-            evaluate_script = ["python", "src/Search/evaluate.py", run_path, "--split", split_choice]
+            evaluate_script = ["python", "src/Evaluation/evaluate.py", run_path, "--split", split_choice]
             run_command(evaluate_script, env=current_env)
     else:
         print("\n TEST run generated successfully. No local evaluation possible.")

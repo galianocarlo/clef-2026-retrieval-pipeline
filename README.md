@@ -36,8 +36,6 @@ All the contents of this repository are shared using the [Creative Commons Attri
 
 ![CC logo](https://i.creativecommons.org/l/by-sa/4.0/88x31.png)
 
-
-
 ## Organization of the `code` folder
 
 The `code` folder serves as starter for the participation at [CheckThat! 2026](https://checkthat.gitlab.io/clef2026/task1/) at [CLEF 2026](https://clef2026.clef-initiative.eu/).
@@ -46,7 +44,7 @@ This section contains a multi-stage search pipeline for scientific papers from t
 
 ### pylucene/src/ (The Entry Point)
 
-* **`runner.py`**: The interactive orchestrator and heart of the repository. It provides a user-friendly menu to execute any version of our pipeline (V1 to V4) across different data splits (`train`, `dev`, `test`). It dynamically manages environment variables for FAISS vector dimensions, safely coordinates index building, executes the search scripts, and can automatically trigger the evaluation script to display the official Macro-Averaged scores.
+* **`runner.py`**: It provides a user-friendly menu to execute any version of our pipeline (V1 to V4) across different data splits (`train`, `dev`, `test`). It dynamically manages environment variables for FAISS vector dimensions, safely coordinates index building, executes the search scripts, and can automatically trigger the evaluation script to display the official scores. (python src/runner.py)
 
 * **`load_dataset.py`**: It connects to the HuggingFace repository to fetch the raw CLEF dataset splits (Train, Dev, Test) across all target languages (EN, FR, DE). It automatically formats and saves the data as `.jsonl` files directly into the `experiment/docs/` directory.
 

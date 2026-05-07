@@ -31,7 +31,7 @@ from sentence_transformers import SentenceTransformer, CrossEncoder
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 from src.Parse.parse_documents import ParsedDocument
 from src.Parse.parse_query import JsonArrayQueryParser
-
+import argparse
 # Initialize JVM
 assert lucene.getVMEnv() or lucene.initVM(), "Lucene version not available"
 
@@ -307,65 +307,80 @@ class Searcher:
 
 
 if __name__ == "__main__":
-    SCRIPT_DIR  = os.path.dirname(os.path.abspath(__file__))
-    INDEX_PATH  = os.path.abspath(os.path.join(SCRIPT_DIR, "..", "..", "experiment", "index"))
-    RUNS_PATH   = os.path.abspath(os.path.join(SCRIPT_DIR, "..", "..", "experiment", "runs"))
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--split", choices=["train", "dev", "test"], default="dev", help="Dataset split to evaluate")
+    args = parser.parse_args()
+    
+    current_split = args.split
+
+    # 1. Define all absolute paths
+    SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+    INDEX_PATH = os.path.abspath(os.path.join(SCRIPT_DIR, "..", "..", "experiment", "index"))
+    RUNS_PATH = os.path.abspath(os.path.join(SCRIPT_DIR, "..", "..", "experiment", "runs"))
     DATA_FOLDER = os.path.abspath(os.path.join(SCRIPT_DIR, "..", "..", "experiment", "docs"))
 
-    similarity  = BM25Similarity(0.9, 0.8)
+    similarity = BM25Similarity(0.9, 0.8)
+
+    # Per-field analyzers
     analyzer_map = HashMap()
+
     analyzer_map.put(f"{ParsedDocument.FIELDS.TITLE}_en",       EnglishAnalyzer())
     analyzer_map.put(f"{ParsedDocument.FIELDS.ABSTRACT}_en",    EnglishAnalyzer())
+
     analyzer_map.put(f"{ParsedDocument.FIELDS.TITLE}_fr",       FrenchAnalyzer())
     analyzer_map.put(f"{ParsedDocument.FIELDS.ABSTRACT}_fr",    FrenchAnalyzer())
+
     analyzer_map.put(f"{ParsedDocument.FIELDS.TITLE}_de",       GermanAnalyzer())
     analyzer_map.put(f"{ParsedDocument.FIELDS.ABSTRACT}_de",    GermanAnalyzer())
+    # added
     analyzer_map.put(f"{ParsedDocument.FIELDS.TITLE}_other",    StandardAnalyzer())
     analyzer_map.put(f"{ParsedDocument.FIELDS.ABSTRACT}_other", StandardAnalyzer())
+
     multi_analyzer = PerFieldAnalyzerWrapper(StandardAnalyzer(), analyzer_map)
+
+    current_run_id = f"run-V3_{current_split}"
 
     engine = Searcher(
         analyzer=multi_analyzer,
         similarity=similarity,
         index_path=INDEX_PATH,
-        run_id="run-V3_train",
+        run_id=current_run_id,
         run_path=RUNS_PATH,
-        max_docs_retrieved=1000,
+        max_docs_retrieved=1000  # standard: top 1000
     )
 
-    
-    tasks = [
-        {"file": "en_train.jsonl", "lang": "en", "expected": 14977},
-        {"file": "de_train.jsonl", "lang": "de", "expected": 1460},
-        {"file": "fr_train.jsonl", "lang": "fr", "expected": 2807},
-    ]
-    
-    '''
-    tasks = [
-        {"file": "final_en_test.jsonl", "lang": "en", "expected": 6080},
-        {"file": "final_de_test.jsonl", "lang": "de", "expected": 876},
-        {"file": "final_fr_test.jsonl", "lang": "fr", "expected": 1220},
-    ]
-    '''
-    '''
-    tasks = [
-        {"file": "en_dev.jsonl",  "lang": "en", "expected": 3905},
-        {"file": "de_dev.jsonl",  "lang": "de", "expected": 386},
-        {"file": "fr_dev.jsonl",  "lang": "fr", "expected": 702},
-    ]'''
-    
+    # Define the batches of queries to process
+    ALL_TASKS = {
+        "train": [
+            {"file": "en_train.jsonl", "lang": "en", "expected": 14977},
+            {"file": "de_train.jsonl", "lang": "de", "expected": 1460},
+            {"file": "fr_train.jsonl", "lang": "fr", "expected": 2807},
+        ],
+        "dev": [
+            {"file": "en_dev.jsonl",  "lang": "en", "expected": 3905},
+            {"file": "de_dev.jsonl",  "lang": "de", "expected": 386},
+            {"file": "fr_dev.jsonl",  "lang": "fr", "expected": 702},
+        ],
+        "test": [
+            {"file": "final_en_test.jsonl", "lang": "en", "expected": 6080},
+            {"file": "final_de_test.jsonl", "lang": "de", "expected": 876},
+            {"file": "final_fr_test.jsonl", "lang": "fr", "expected": 1220},
+        ]
+    }
+
+    tasks = ALL_TASKS[current_split]
     try:
         for task in tasks:
             file_path = os.path.join(DATA_FOLDER, task["file"])
             if not os.path.exists(file_path):
                 print(f"Skipping {task['file']} — file not found.")
                 continue
+
             print(f"Processing: {task['file']}")
             with open(file_path, "r", encoding="utf-8") as f:
-                parser = JsonArrayQueryParser(
-                    f, lang_code=task["lang"]
-                )
+                parser = JsonArrayQueryParser(f, lang_code=task["lang"])
                 engine.search_topics(parser, task["expected"])
+
     finally:
         engine.close()
-        print(f"Hybrid Search Completed")
+        print(f"\nSearching Complete")

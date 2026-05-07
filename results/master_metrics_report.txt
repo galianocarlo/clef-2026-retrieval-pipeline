@@ -2,347 +2,332 @@
    SEUPD 25/26 - GLOBAL RUN METRICS REPORT               
 =========================================================
 
-🏆 LEADERBOARD (Ordinata per MRR@5 Globale)
------------------------------------------------------------------------------------------------------------------------------
-| Pos | Run File                         | MRR@5   | P@1     | R@1000  | Descrizione
------------------------------------------------------------------------------------------------------------------------------
-| 1   | run-hybrid-reranked.txt          | 0.4573  | 0.4058  | 0.5370   | V4 (Asymmetric Hybrid): Language-routed pipeline using pure lexical BM25 for English queries, and a Dense+Lexical Hybrid approach with Neural Re-ranking strictly for German and French.
-| 2   | run-hybrid-best.txt              | 0.4283  | 0.3835  | 0.7703   | V3 (Final): Hybrid pipeline combining BM25 lexical precision for English with neural re-ranking for DE and FR.
-| 3   | run-native-analyzers.txt         | 0.3984  | 0.3559  | 0.8185   | V1: Base asymmetric search using PyLucene, BM25, and native multilingual analyzers.
-| 4   | run-hybrid-best-prf.txt          | 0.3862  | 0.3212  | 0.7697   | V3 + PRF (Experimental): Hybrid pipeline built on the PRF expansion, combining BM25+PRF for English with Neural+PRF re-ranking for DE and FR.
-| 5   | run-native-analyzers-prf.txt     | 0.3583  | 0.2938  | 0.8207   | V2: BM25 enhanced with Pseudo-Relevance Feedback (PRF) for medical term expansion.
-| 6   | run-neural-reranked.txt          | 0.3107  | 0.2730  | 0.6810   | V1 + Neural: Semantic re-ranking of the V1 Top 100 using a HuggingFace Cross-Encoder.
-| 7   | run-neural-reranked-prf.txt      | 0.3065  | 0.2676  | 0.6721   | V2 + Neural: Semantic re-ranking applied to the PRF-expanded run.
------------------------------------------------------------------------------------------------------------------------------
+🏆 LEADERBOARD - DEV SET (Ordinata per MACRO MRR@5)
+---------------------------------------------------------------------------------------------------------------------------------------
+| Pos | Run File                  | MRR@5   | P@1     | R@1000  | Descrizione
+---------------------------------------------------------------------------------------------------------------------------------------
+| 1   | run-V4_dev.txt            | 0.4919  | 0.4312  | 0.8565   | V4: SOTA Hybrid Architecture (bge-m3 + Cross-Encoder, No Chunking)
+| 2   | run-V3_dev.txt            | 0.3913  | 0.3379  | 0.8371   | V3: Hybrid Asymmetric Search (e5-base + Cross-Encoder + Chunking)
+| 3   | run-V1_dev.txt            | 0.2190  | 0.1859  | 0.6962   | V1: Lexical Baseline (BM25, Native Analyzers)
+| 4   | run-V2_dev.txt            | 0.1892  | 0.1482  | 0.6761   | V2: Statistical PRF (Pseudo-Relevance Feedback)
+---------------------------------------------------------------------------------------------------------------------------------------
 
-📄 DETTAGLI PER SINGOLA RUN (Ordinate dalla migliore alla peggiore)
+🏆 LEADERBOARD - TRAIN SET (Ordinata per MACRO MRR@5)
+---------------------------------------------------------------------------------------------------------------------------------------
+| Pos | Run File                  | MRR@5   | P@1     | R@1000  | Descrizione
+---------------------------------------------------------------------------------------------------------------------------------------
+| 1   | run-V3_train.txt          | 0.3957  | 0.3458  | 0.8491   | V3: Hybrid Asymmetric Search (e5-base + Cross-Encoder + Chunking)
+| 2   | run-V1_train.txt          | 0.2301  | 0.1963  | 0.7275   | V1: Lexical Baseline (BM25, Native Analyzers)
+| 3   | run-V2_train.txt          | 0.1971  | 0.1556  | 0.6990   | V2: Statistical PRF (Pseudo-Relevance Feedback)
+---------------------------------------------------------------------------------------------------------------------------------------
+
+📄 RUNS DETAILS
 =========================================================
 
-🏆 Posizione in classifica: 1
-📁 RUN FILE: run-hybrid-reranked.txt
-📝 DESCRIPTION: V4 (Asymmetric Hybrid): Language-routed pipeline using pure lexical BM25 for English queries, and a Dense+Lexical Hybrid approach with Neural Re-ranking strictly for German and French.
+RUN FILE: run-V4_dev.txt
+DESCRIPTION: V4: SOTA Hybrid Architecture (bge-m3 + Cross-Encoder, No Chunking)
 ----------------------------------------
 === Starting Search Engine Evaluation ===
 
-Loading Qrels (Ground Truth)...
-Loading Run (Search Engine Results)...
-Computing metrics...
-
-=======================================
-          OFFICIAL RESULTS             
-=======================================
- MRR@5     : 0.4573
- MAP       : 0.4573
- NDCG@10   : 0.4773
- PRECISION@1: 0.4058
- RECALL@1000: 0.5370
-=======================================
+Evaluating: run-V4_dev.txt against qrels_dev.txt
 
 =======================================
       RESULTS BY LANGUAGE              
 =======================================
---- Language: EN ---
- MRR@5     : 0.4914
- MAP       : 0.4914
- NDCG@10   : 0.5112
- PRECISION@1: 0.4399
- RECALL@1000: 0.5700
+--- Language: EN (3905 queries) ---
+ MRR@5     : 0.4898
+ MAP       : 0.5014
+ NDCG@10   : 0.5230
+ PRECISION@1: 0.4387
+ RECALL@1000: 0.8791
 
---- Language: DE ---
- MRR@5     : 0.2639
- MAP       : 0.2639
- NDCG@10   : 0.2827
- PRECISION@1: 0.2176
- RECALL@1000: 0.3394
+--- Language: DE (386 queries) ---
+ MRR@5     : 0.4382
+ MAP       : 0.4503
+ NDCG@10   : 0.4824
+ PRECISION@1: 0.3679
+ RECALL@1000: 0.8057
 
---- Language: FR ---
- MRR@5     : 0.3736
- MAP       : 0.3736
- NDCG@10   : 0.3956
- PRECISION@1: 0.3191
- RECALL@1000: 0.4615
+--- Language: FR (702 queries) ---
+ MRR@5     : 0.5476
+ MAP       : 0.5596
+ NDCG@10   : 0.5840
+ PRECISION@1: 0.4872
+ RECALL@1000: 0.8846
+
+==========================
+  OFFICIAL MACRO-AVERAGE  
+==========================
+ MACRO MRR@5     : 0.4919
+ MACRO MAP       : 0.5038
+ MACRO NDCG@10   : 0.5298
+ MACRO PRECISION@1: 0.4312
+ MACRO RECALL@1000: 0.8565
+==========================
 
 
 ************************************************************
 
-🏆 Posizione in classifica: 2
-📁 RUN FILE: run-hybrid-best.txt
-📝 DESCRIPTION: V3 (Final): Hybrid pipeline combining BM25 lexical precision for English with neural re-ranking for DE and FR.
+RUN FILE: run-V3_dev.txt
+DESCRIPTION: V3: Hybrid Asymmetric Search (e5-base + Cross-Encoder + Chunking)
 ----------------------------------------
 === Starting Search Engine Evaluation ===
 
-Loading Qrels (Ground Truth)...
-Loading Run (Search Engine Results)...
-Computing metrics...
-
-=======================================
-          OFFICIAL RESULTS             
-=======================================
- MRR@5     : 0.4283
- MAP       : 0.4394
- NDCG@10   : 0.4588
- PRECISION@1: 0.3835
- RECALL@1000: 0.7703
-=======================================
+Evaluating: run-V3_dev.txt against qrels_dev.txt
 
 =======================================
       RESULTS BY LANGUAGE              
 =======================================
---- Language: EN ---
- MRR@5     : 0.4900
- MAP       : 0.5018
- NDCG@10   : 0.5238
+--- Language: EN (3905 queries) ---
+ MRR@5     : 0.4910
+ MAP       : 0.5026
+ NDCG@10   : 0.5247
  PRECISION@1: 0.4392
- RECALL@1000: 0.8758
+ RECALL@1000: 0.8791
 
---- Language: DE ---
- MRR@5     : 0.1653
- MAP       : 0.1760
- NDCG@10   : 0.1839
- PRECISION@1: 0.1477
- RECALL@1000: 0.3731
+--- Language: DE (386 queries) ---
+ MRR@5     : 0.2919
+ MAP       : 0.3078
+ NDCG@10   : 0.3302
+ PRECISION@1: 0.2383
+ RECALL@1000: 0.7876
 
---- Language: FR ---
- MRR@5     : 0.2295
- MAP       : 0.2372
- NDCG@10   : 0.2488
- PRECISION@1: 0.2037
- RECALL@1000: 0.4017
+--- Language: FR (702 queries) ---
+ MRR@5     : 0.3910
+ MAP       : 0.4058
+ NDCG@10   : 0.4281
+ PRECISION@1: 0.3362
+ RECALL@1000: 0.8447
+
+==========================
+  OFFICIAL MACRO-AVERAGE  
+==========================
+ MACRO MRR@5     : 0.3913
+ MACRO MAP       : 0.4054
+ MACRO NDCG@10   : 0.4277
+ MACRO PRECISION@1: 0.3379
+ MACRO RECALL@1000: 0.8371
+==========================
 
 
 ************************************************************
 
-🏆 Posizione in classifica: 3
-📁 RUN FILE: run-native-analyzers.txt
-📝 DESCRIPTION: V1: Base asymmetric search using PyLucene, BM25, and native multilingual analyzers.
+RUN FILE: run-V1_dev.txt
+DESCRIPTION: V1: Lexical Baseline (BM25, Native Analyzers)
 ----------------------------------------
 === Starting Search Engine Evaluation ===
 
-Loading Qrels (Ground Truth)...
-Loading Run (Search Engine Results)...
-Computing metrics...
-
-=======================================
-          OFFICIAL RESULTS             
-=======================================
- MRR@5     : 0.3984
- MAP       : 0.4109
- NDCG@10   : 0.4303
- PRECISION@1: 0.3559
- RECALL@1000: 0.8185
-=======================================
+Evaluating: run-V1_dev.txt against qrels_dev.txt
 
 =======================================
       RESULTS BY LANGUAGE              
 =======================================
---- Language: EN ---
- MRR@5     : 0.4900
- MAP       : 0.5018
- NDCG@10   : 0.5238
+--- Language: EN (3905 queries) ---
+ MRR@5     : 0.4910
+ MAP       : 0.5026
+ NDCG@10   : 0.5247
  PRECISION@1: 0.4392
- RECALL@1000: 0.8758
+ RECALL@1000: 0.8791
 
---- Language: DE ---
- MRR@5     : 0.0953
- MAP       : 0.1090
- NDCG@10   : 0.1230
- PRECISION@1: 0.0777
- RECALL@1000: 0.4922
+--- Language: DE (386 queries) ---
+ MRR@5     : 0.0968
+ MAP       : 0.1097
+ NDCG@10   : 0.1280
+ PRECISION@1: 0.0699
+ RECALL@1000: 0.5285
 
---- Language: FR ---
- MRR@5     : 0.0553
+--- Language: FR (702 queries) ---
+ MRR@5     : 0.0691
+ MAP       : 0.0842
+ NDCG@10   : 0.0938
+ PRECISION@1: 0.0484
+ RECALL@1000: 0.6809
+
+==========================
+  OFFICIAL MACRO-AVERAGE  
+==========================
+ MACRO MRR@5     : 0.2190
+ MACRO MAP       : 0.2322
+ MACRO NDCG@10   : 0.2488
+ MACRO PRECISION@1: 0.1859
+ MACRO RECALL@1000: 0.6962
+==========================
+
+
+************************************************************
+
+RUN FILE: run-V2_dev.txt
+DESCRIPTION: V2: Statistical PRF (Pseudo-Relevance Feedback)
+----------------------------------------
+=== Starting Search Engine Evaluation ===
+
+Evaluating: run-V2_dev.txt against qrels_dev.txt
+
+=======================================
+      RESULTS BY LANGUAGE              
+=======================================
+--- Language: EN (3905 queries) ---
+ MRR@5     : 0.4285
+ MAP       : 0.4414
+ NDCG@10   : 0.4708
+ PRECISION@1: 0.3557
+ RECALL@1000: 0.8791
+
+--- Language: DE (386 queries) ---
+ MRR@5     : 0.0806
+ MAP       : 0.0902
+ NDCG@10   : 0.1059
+ PRECISION@1: 0.0518
+ RECALL@1000: 0.5052
+
+--- Language: FR (702 queries) ---
+ MRR@5     : 0.0585
  MAP       : 0.0716
- NDCG@10   : 0.0792
- PRECISION@1: 0.0456
- RECALL@1000: 0.6795
+ NDCG@10   : 0.0789
+ PRECISION@1: 0.0370
+ RECALL@1000: 0.6439
+
+==========================
+  OFFICIAL MACRO-AVERAGE  
+==========================
+ MACRO MRR@5     : 0.1892
+ MACRO MAP       : 0.2011
+ MACRO NDCG@10   : 0.2185
+ MACRO PRECISION@1: 0.1482
+ MACRO RECALL@1000: 0.6761
+==========================
 
 
 ************************************************************
 
-🏆 Posizione in classifica: 4
-📁 RUN FILE: run-hybrid-best-prf.txt
-📝 DESCRIPTION: V3 + PRF (Experimental): Hybrid pipeline built on the PRF expansion, combining BM25+PRF for English with Neural+PRF re-ranking for DE and FR.
+RUN FILE: run-V3_train.txt
+DESCRIPTION: V3: Hybrid Asymmetric Search (e5-base + Cross-Encoder + Chunking)
 ----------------------------------------
 === Starting Search Engine Evaluation ===
 
-Loading Qrels (Ground Truth)...
-Loading Run (Search Engine Results)...
-Computing metrics...
-
-=======================================
-          OFFICIAL RESULTS             
-=======================================
- MRR@5     : 0.3862
- MAP       : 0.3974
- NDCG@10   : 0.4233
- PRECISION@1: 0.3212
- RECALL@1000: 0.7697
-=======================================
+Evaluating: run-V3_train.txt against qrels_train.txt
 
 =======================================
       RESULTS BY LANGUAGE              
 =======================================
---- Language: EN ---
- MRR@5     : 0.4386
- MAP       : 0.4507
- NDCG@10   : 0.4810
- PRECISION@1: 0.3624
- RECALL@1000: 0.8796
+--- Language: EN (14977 queries) ---
+ MRR@5     : 0.5028
+ MAP       : 0.5150
+ NDCG@10   : 0.5378
+ PRECISION@1: 0.4534
+ RECALL@1000: 0.8873
 
---- Language: DE ---
- MRR@5     : 0.1556
- MAP       : 0.1652
- NDCG@10   : 0.1730
- PRECISION@1: 0.1373
- RECALL@1000: 0.3472
+--- Language: DE (1460 queries) ---
+ MRR@5     : 0.2906
+ MAP       : 0.3074
+ NDCG@10   : 0.3293
+ PRECISION@1: 0.2390
+ RECALL@1000: 0.8007
 
---- Language: FR ---
- MRR@5     : 0.2210
- MAP       : 0.2285
- NDCG@10   : 0.2400
- PRECISION@1: 0.1937
- RECALL@1000: 0.3903
+--- Language: FR (2807 queries) ---
+ MRR@5     : 0.3937
+ MAP       : 0.4084
+ NDCG@10   : 0.4283
+ PRECISION@1: 0.3449
+ RECALL@1000: 0.8593
+
+==========================
+  OFFICIAL MACRO-AVERAGE  
+==========================
+ MACRO MRR@5     : 0.3957
+ MACRO MAP       : 0.4103
+ MACRO NDCG@10   : 0.4318
+ MACRO PRECISION@1: 0.3458
+ MACRO RECALL@1000: 0.8491
+==========================
 
 
 ************************************************************
 
-🏆 Posizione in classifica: 5
-📁 RUN FILE: run-native-analyzers-prf.txt
-📝 DESCRIPTION: V2: BM25 enhanced with Pseudo-Relevance Feedback (PRF) for medical term expansion.
+RUN FILE: run-V1_train.txt
+DESCRIPTION: V1: Lexical Baseline (BM25, Native Analyzers)
 ----------------------------------------
 === Starting Search Engine Evaluation ===
 
-Loading Qrels (Ground Truth)...
-Loading Run (Search Engine Results)...
-Computing metrics...
-
-=======================================
-          OFFICIAL RESULTS             
-=======================================
- MRR@5     : 0.3583
- MAP       : 0.3707
- NDCG@10   : 0.3969
- PRECISION@1: 0.2938
- RECALL@1000: 0.8207
-=======================================
+Evaluating: run-V1_train.txt against qrels_train.txt
 
 =======================================
       RESULTS BY LANGUAGE              
 =======================================
---- Language: EN ---
- MRR@5     : 0.4386
- MAP       : 0.4507
- NDCG@10   : 0.4810
- PRECISION@1: 0.3624
- RECALL@1000: 0.8796
+--- Language: EN (14977 queries) ---
+ MRR@5     : 0.5028
+ MAP       : 0.5150
+ NDCG@10   : 0.5378
+ PRECISION@1: 0.4534
+ RECALL@1000: 0.8873
 
---- Language: DE ---
- MRR@5     : 0.0959
- MAP       : 0.1071
- NDCG@10   : 0.1218
- PRECISION@1: 0.0648
- RECALL@1000: 0.5078
+--- Language: DE (1460 queries) ---
+ MRR@5     : 0.0970
+ MAP       : 0.1108
+ NDCG@10   : 0.1294
+ PRECISION@1: 0.0664
+ RECALL@1000: 0.5699
 
---- Language: FR ---
- MRR@5     : 0.0560
- MAP       : 0.0708
- NDCG@10   : 0.0806
- PRECISION@1: 0.0385
- RECALL@1000: 0.6652
+--- Language: FR (2807 queries) ---
+ MRR@5     : 0.0904
+ MAP       : 0.1053
+ NDCG@10   : 0.1147
+ PRECISION@1: 0.0691
+ RECALL@1000: 0.7253
+
+==========================
+  OFFICIAL MACRO-AVERAGE  
+==========================
+ MACRO MRR@5     : 0.2301
+ MACRO MAP       : 0.2437
+ MACRO NDCG@10   : 0.2606
+ MACRO PRECISION@1: 0.1963
+ MACRO RECALL@1000: 0.7275
+==========================
 
 
 ************************************************************
 
-🏆 Posizione in classifica: 6
-📁 RUN FILE: run-neural-reranked.txt
-📝 DESCRIPTION: V1 + Neural: Semantic re-ranking of the V1 Top 100 using a HuggingFace Cross-Encoder.
+RUN FILE: run-V2_train.txt
+DESCRIPTION: V2: Statistical PRF (Pseudo-Relevance Feedback)
 ----------------------------------------
 === Starting Search Engine Evaluation ===
 
-Loading Qrels (Ground Truth)...
-Loading Run (Search Engine Results)...
-Computing metrics...
-
-=======================================
-          OFFICIAL RESULTS             
-=======================================
- MRR@5     : 0.3107
- MAP       : 0.3268
- NDCG@10   : 0.3446
- PRECISION@1: 0.2730
- RECALL@1000: 0.6810
-=======================================
+Evaluating: run-V2_train.txt against qrels_train.txt
 
 =======================================
       RESULTS BY LANGUAGE              
 =======================================
---- Language: EN ---
- MRR@5     : 0.3396
- MAP       : 0.3579
- NDCG@10   : 0.3777
- PRECISION@1: 0.2978
- RECALL@1000: 0.7616
+--- Language: EN (14977 queries) ---
+ MRR@5     : 0.4377
+ MAP       : 0.4509
+ NDCG@10   : 0.4822
+ PRECISION@1: 0.3622
+ RECALL@1000: 0.8857
 
---- Language: DE ---
- MRR@5     : 0.1653
- MAP       : 0.1760
- NDCG@10   : 0.1839
- PRECISION@1: 0.1477
- RECALL@1000: 0.3731
+--- Language: DE (1460 queries) ---
+ MRR@5     : 0.0795
+ MAP       : 0.0918
+ NDCG@10   : 0.1058
+ PRECISION@1: 0.0555
+ RECALL@1000: 0.5219
 
---- Language: FR ---
- MRR@5     : 0.2295
- MAP       : 0.2372
- NDCG@10   : 0.2488
- PRECISION@1: 0.2037
- RECALL@1000: 0.4017
+--- Language: FR (2807 queries) ---
+ MRR@5     : 0.0742
+ MAP       : 0.0880
+ NDCG@10   : 0.0973
+ PRECISION@1: 0.0492
+ RECALL@1000: 0.6893
 
-
-************************************************************
-
-🏆 Posizione in classifica: 7
-📁 RUN FILE: run-neural-reranked-prf.txt
-📝 DESCRIPTION: V2 + Neural: Semantic re-ranking applied to the PRF-expanded run.
-----------------------------------------
-=== Starting Search Engine Evaluation ===
-
-Loading Qrels (Ground Truth)...
-Loading Run (Search Engine Results)...
-Computing metrics...
-
-=======================================
-          OFFICIAL RESULTS             
-=======================================
- MRR@5     : 0.3065
- MAP       : 0.3220
- NDCG@10   : 0.3405
- PRECISION@1: 0.2676
- RECALL@1000: 0.6721
-=======================================
-
-=======================================
-      RESULTS BY LANGUAGE              
-=======================================
---- Language: EN ---
- MRR@5     : 0.3367
- MAP       : 0.3543
- NDCG@10   : 0.3751
- PRECISION@1: 0.2937
- RECALL@1000: 0.7549
-
---- Language: DE ---
- MRR@5     : 0.1556
- MAP       : 0.1652
- NDCG@10   : 0.1730
- PRECISION@1: 0.1373
- RECALL@1000: 0.3472
-
---- Language: FR ---
- MRR@5     : 0.2210
- MAP       : 0.2285
- NDCG@10   : 0.2400
- PRECISION@1: 0.1937
- RECALL@1000: 0.3903
+==========================
+  OFFICIAL MACRO-AVERAGE  
+==========================
+ MACRO MRR@5     : 0.1971
+ MACRO MAP       : 0.2102
+ MACRO NDCG@10   : 0.2284
+ MACRO PRECISION@1: 0.1556
+ MACRO RECALL@1000: 0.6990
+==========================
 
 
 ************************************************************

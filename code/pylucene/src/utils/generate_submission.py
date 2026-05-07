@@ -87,7 +87,7 @@ def main():
     if len(sys.argv) > 1:
         run_path = sys.argv[1]
     else:
-        run_path = os.path.join(RUNS_DIR, "run-hybrid-best.txt")
+        run_path = os.path.join(RUNS_DIR, "run-V4_test.txt")
 
     if not os.path.exists(run_path):
         print(f"[!] Run file not found: {run_path}")

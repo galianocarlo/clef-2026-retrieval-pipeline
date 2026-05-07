@@ -5,8 +5,8 @@ import re
 
 # 1. Dictionary of run prefixes
 DESCRIPTIONS = {
-    "run-v1": "V1: Lexical Baseline (BM25, Native Analyzers)",
-    "run-v2": "V2: Statistical PRF (Pseudo-Relevance Feedback)",
+    "run-V1": "V1: Lexical Baseline (BM25, Native Analyzers)",
+    "run-V2": "V2: Statistical PRF (Pseudo-Relevance Feedback)",
     "run-V3": "V3: Hybrid Asymmetric Search (e5-base + Cross-Encoder + Chunking)",
     "run-V4": "V4: SOTA Hybrid Architecture (bge-m3 + Cross-Encoder, No Chunking)"
 }
@@ -26,7 +26,7 @@ def main():
     os.makedirs(RESULTS_DIR, exist_ok=True)
     report_output_path = os.path.join(RESULTS_DIR, "master_metrics_report.txt")
 
-    print(f"🔍 Scanning directory: {RUNS_DIR}")
+    print(f"Scanning directory: {RUNS_DIR}")
     
     dev_results = []
     train_results = []
