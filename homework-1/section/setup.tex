@@ -34,8 +34,9 @@ and query splits.
     \toprule
     Split & English & German & French \\
     \midrule
-    Train queries & 8{,}329 & 4{,}296 & 4{,}296 \\
+    Train queries & 14977 & 1460 & 2807 \\
     Dev queries   & 3905 & 386 & 702 \\
+    Test queries  & 6080 & 876 & 1220 \\
     \midrule
     Corpus documents & \multicolumn{3}{c}{10{,}000} \\
     \bottomrule
@@ -57,22 +58,16 @@ provided with each query.
 \label{subsec:repo}
 
 The source code is publicly available at:
-\url{TODO: add bitbucket URL here}.
+\url{https://bitbucket.org/upd-dei-stud-prj/seupd2526-dspy/src/master/}.
 %
 The repository is organised as follows:
 \begin{itemize}
-  \item \texttt{pylucene/src/Index/} — indexing pipeline (\texttt{index.py},
-        \texttt{index\_faiss.py}) and the shared analyzer factory
-        (\texttt{analyzers.py}).
-  \item \texttt{pylucene/src/Search/} — retrieval scripts: \texttt{search.py}
-        (BM25 baseline), \texttt{search\_prf.py} (BM25 + \ac{PRF}),
-        \texttt{rerank.py} (neural cross-encoder re-ranking).
-  \item \texttt{pylucene/src/Parse/} — document and query parsers, and the
-        journal entity list (\texttt{journals.txt}).
-  \item \texttt{pylucene/src/Evaluation/} — evaluation scripts and failure
-        analysis utilities.
-  \item \texttt{experiment/} — generated artefacts (index, runs, qrels); not
-        committed to version control.
+  \item \texttt{pylucene/src/} — entry point orchestrator (\texttt{runner.py}) and data acquisition scripts.
+  \item \texttt{pylucene/src/Index/} — core PyLucene and FAISS indexing pipelines (\texttt{index.py}, \\ \texttt{index\_faiss.py}).
+  \item \texttt{pylucene/src/Search/} — core execution scripts for the four retrieval methodologies \\(\texttt{search\_v1.py} to \texttt{search\_v4.py}).
+  \item \texttt{pylucene/src/Parse/} — data pre-processing and formatting classes for documents and queries.
+  \item \texttt{pylucene/src/Evaluation/} \& \texttt{utils/} — scoring (\texttt{evaluate.py}), report generation, ground truth creation, and submission formatting.
+  \item \texttt{experiment/} — generated artefacts (index, runs, qrels); not committed to version control.
 \end{itemize}
 
 \subsection{Hardware and Software}
@@ -100,7 +95,4 @@ which bundles PyLucene~9 (Lucene~9.x) on Python~3.11 (to check).
   \end{tabular}
 \end{table}
 
-The Docker environment also exposes a Jupyter notebook server on port~8888 for Exploratory Data Analysis. 
-The GPU of Machine~2 was used to accelerate the neural cross-encoder re-ranker (\texttt{rerank.py}) and 
-FAISS dense retrieval experiments (\texttt{index\_faiss.py} and \texttt{search\_faiss.py}). 
-All BM25 indexing , and \ac{PRF}  are fully reproducible on \ac{CPU} and were run on all three machines.
+The Docker environment also exposes a Jupyter notebook server on port~8888 for Exploratory Data Analysis. The GPU of Machine~2 was used to accelerate the neural cross-encoder re-ranker (\texttt{rerank.py}) and FAISS dense retrieval experiments (\texttt{index\_faiss.py} and \texttt{search\_faiss.py}). All BM25 indexing , and \ac{PRF}  are fully reproducible on \ac{CPU} and were run on all three machines.

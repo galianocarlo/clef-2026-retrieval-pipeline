@@ -1,16 +1,18 @@
 \documentclass{ceurart}
 
+\usepackage{float}
 \usepackage{acronym}
 \usepackage{subcaption}
 \input{acronyms.tex}
 \renewcommand{\acffont}[1]{\textsl{#1}}
-
+% for the diagrams
+\usepackage{tikz}
+\usepackage{tabularx}
 
 %%
 %% end of the preamble, start of the body of the document source.
 \begin{document}
 \bibliographystyle{plainnat}
-\bibliography{bibliography}
 %%
 %% Rights management information.
 %% CC-BY is default license.
@@ -64,11 +66,14 @@ email=stefano.riato@studenti.unipd.it
 %% Keywords. The author(s) should pick words that accurately describe
 %% the work being presented. Separate the keywords with commas.
 \begin{keywords}
-  keyword 1 \sep
-  keyword 2 \sep
-  keyword 3 
+  Multilingual Information Retrieval \sep
+  Claim Verification \sep
+  Asymmetric Hybrid Search \sep
+  Dense Retrieval \sep
+  Cross-Encoder Re-ranking \sep
+  Vocabulary Mismatch \sep
+  CLEF CheckThat! Lab
 \end{keywords}
-
 %%
 %% This command processes the author and affiliation and title
 %% information and builds the first part of the formatted document.
@@ -77,7 +82,7 @@ email=stefano.riato@studenti.unipd.it
 
 \input{section/introduction}
 
-\input{section/related-worked}
+%\input{section/related-worked} not necessary for this homework
 
 \input{section/methodology}
 
@@ -91,5 +96,5 @@ email=stefano.riato@studenti.unipd.it
 
 %\input{section/added-section-to-be-removed}
 
-
+\bibliography{bibliography}
 \end{document}
