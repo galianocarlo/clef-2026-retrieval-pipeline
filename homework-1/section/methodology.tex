@@ -120,30 +120,20 @@ iteration (V2) explored a statistical expansion technique known as \ac{PRF}.
 \label{subsec:methodology_v3}
 Taking into consideration the lessons from V2, our third experiment (V3) moved from statistical expansion to a Deep Learning approach, with the intent to capture the true semantic. We adopted an asymmetric architecture that ensures high-precision reranking with computational efficiency.
 \begin{itemize}
-    \item \textbf{Semantic Scoring:} Our experiment used a Transformer-based Cross-Encoder (\texttt{mmarco-mMiniLMv2-L12-H384-v1}). 
-    Unlike Bi-Encoders, Cross-Encoders perform full self-attention across both the concatenated query and document, allowing the deep, word-level semantic interactions of importance in cross-lingual understanding.
-    \item \textbf{Max-P Chunking Strategy:} A key theoretical constraint of Transformers is that they have a fixed-length context window (512 tokens for our selected model), 
-    which causes information loss as not all of the relevant information contained in the medical papers is considered. 
-    To bypass this, we implemented a Max-P (Max-Passage) sliding-window strategy, where
-    documents were partitioned into independent chunks of 250 words, with a 50-word overlap to preserve semantics. The final relevance score for the document would be based on the highest-scoring chunk.
-    \item \textbf{The Retrieval Bottleneck:} Although the Cross-Encoder performs well at re-ordering candidate documents,
-    it was limited by BM25's initial retrieval suitability. If the lexical engine failed to retrieve a relevant cross-lingual document (based upon vocabulary mismatch), the neural re-ranker was unable to evaluate it.
+    \item \textbf{Hybrid Candidate Pooling:} To resolve the "Retrieval Bottleneck" identified in V1 where relevant cross-lingual documents were not retrieved by BM25, \textbf{FAISS} (Facebook AI Similarity Search) was implementsd to perform dense retrieval. For French and German queries, the system merges candidates from BM25 with those from a dense search using the \texttt{intfloat/multilingual-e5-base} model, in order to add semantically relevant documents to the pipeline even if they lack exact keyword overlap.
+    \item \textbf{Neural Re-ranking (Cross-Encoder):} The scoring is performed on the joined candidate pool using a Transformer-based Cross-Encoder (\texttt{cross-encoder/mmarco-mMiniLMv2-L12-H384-v1}). Unlike Bi-Encoders, the Cross-Encoders compute full self-attention on the concatenated query and document, allowing for deep, word-level semantic interactions, which are crucial for cross-lingual understanding.
+    \item \textbf{Max-P Chunking Strategy:} To avoid the 512-token context limit of the selected neural models and preserve all information about the longer abstracts, we adopted a sliding-window strategy. Documents are partitioned into independent chunks of 250 words with a 50-word overlap. The final relevance score is computed via \textbf{Max-P Aggregation}, where only the highest-scoring chunk represents the document.
+    \item \textbf{Asymmetric Optimization:} Given the existing robustness of the lexical engine for English, English queries do not go through the neural pipeline and follow a fast BM25 path. This preserves computational resources for the more challenging French and German cross-lingual tasks.
+    \item \textbf{Tail Padding Integrity:} To preserve the standard Recall@1000, documents retrieved by BM25 but not selected for re-ranking are appended to the final results. Such documents receive penalized scores using the formula $score=-1000.0-rank$, which helps to prevent the “tail” from disturbing the neural “head.”
 \end{itemize}
 
 \subsection{V4: Architecture with Long-Context Embeddings}
 \label{subsec:methodology_v4}
 Although V3 successfully solved the cross-lingual vocabulary gap, the chunking strategy introduced computational burden and the possibility of breaking down long-range semantic dependencies. Our final iteration (V4) optimized the hybrid pipeline by replacing the neural backbone to state-of-the-art neural models designed for long documents.
 \begin{itemize}
-    \item \textbf{Vector Space Projection:} To project queries and documents into a shared continuous
-    vector space, we have integrated FAISS (Facebook AI Similarity Search) to avoid exact-match limitations. The corpus was encoded using the \texttt{intfloat/multilingual-e5-base} model.
-    \item \textbf{Hybrid Candidate Pooling:} To create the starting candidate pool for French and German
-    queries, the first step was to take the exact-keyword precision candidates from Lucene and the contextual candidates from FAISS. This dual-pool strategy maximized the initial Recall,
-    ensuring relevant documents bypassed language barriers prior to being re-ranked by the Cross-Encoder.
-    \item \textbf{Score Normalization and Tail Padding:} Combining two different types of scoring, BM25 and Cross-Encoder logits,
-    presents an architectural challenge due to the large difference in their scoring ranges. To solve this issue,
-    a unified ranking that preserves theoretical Recall@1000 without corrupting top-$k$ Precision, was accomplished using a tail-padding strategy.
-    Documents retrieved by the neural re-ranker populated the top ranks, while the remaining unranked candidates retrieved by BM25 were appended to the tail with a discounted scores (computed as $-1000.0 - rank$). 
-    This mathematically prevents evaluation frameworks from erroneously resorting the list, preserving the integrity of both the deep semantic precision at the top and the broad lexical recall at the bottom of the ranking.
+    \item \textbf{Eliminating Chunking (BGE-M3):} In particular, we replaced the base embedding models with \texttt{BAAI/bge-m3}, a state-of-the-art model that supports a massive context window of up to 8192 tokens. It helped us to eliminate both information loss and additional architectural complexity of the sliding window mechanism since we encoded the full abstract in one step.
+    \item \textbf{Unified High-Dimensional Space:} Increasing the dimensionality from 512 to 1024, provided the system much more expressive semantic representation, which enhanced the first dense retrieval phase for German and French queries, providing a higher-quality candidate pool for the re-ranker.
+    \item \textbf{Refined Hybrid Integrity:} Asymmetric routing is preserved in V4 along with the tail-padding strategy introduced in V3. The combination of long-context dense retrieval, exact-match lexical backup, and protected evaluation integrity represents our most robust and effective architecture for cross-lingual clinical retrieval.
 \end{itemize}
 % Alberto
 \subsection{Document and Query Parsing}
