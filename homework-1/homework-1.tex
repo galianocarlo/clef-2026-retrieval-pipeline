@@ -49,12 +49,15 @@ email=stefano.riato@studenti.unipd.it
 %% The abstract is a short summary of the work to be presented in the
 %% article.
 \begin{abstract}
-  A clear and well-documented \LaTeX{} document is presented as an
-  article formatted for publication by CEUR-WS in a conference
-  proceedings. Based on the ``ceurart'' document class, this article
-  presents and explains many of the common variations, as well as many
-  of the formatting elements an author may use in the preparation of
-  the documentation of their work.
+  This paper presents Team DSPY's Information Retrieval (IR) system for the CLEF 2026 CheckThat! Lab Task 1, 
+  where the main goal is to retrieve scientific publications for multilingual social media claims. 
+  The primary challenge is the high degree of vocabulary mismatch between short multilingual tweets and long technical abstracts 
+  centered on English. As such, the development of our system goes beyond the initial baseline algorithm (i.e. BM25) 
+  to a sophisticated neural architecture. As the results of empirical analysis suggested that statistical query expansion 
+  (Pseudo-Relevance Feedback) suffers from topic drift, we designed an \textbf{Asymmetric Hybrid Search Pipeline}. 
+  This novel approach routes English queries through a highly-tuned lexical engine, while reserving computationally expensive 
+  long-context dense retrieval (BGE-M3) and Cross-Encoder semantic re-ranking strictly for the processing of French and German queries. 
+  The proposed solution has proved to be efficient in terms of the averaged MRR@5 score.
 \end{abstract}
 
 %%

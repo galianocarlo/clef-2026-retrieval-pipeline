@@ -1,44 +1,34 @@
 \section{Introduction}
 \label{sec:introduction}
-\textbf{[To review]}
+This report aims to provide a brief explanation of the Information Retrieval system built for Task 1. This paper aims to share the experiments, the analysis, and the results obtained  during the course of the one month in order to compete in the CheckThat!~Lab Task~1 competition. 
+
 The CLEF~2026 CheckThat!~Lab Task~1 frames scientific claim retrieval as
-a low-resource, cross-lingual ad-hoc retrieval problem.
-As shown in Figure~\ref{fig:task-definition}, given a tweet — written mainly in English, German,
-or French — that implicitly cites a scientific paper, the system must rank a fixed corpus
-of 10{,}000~scientific papers so that the cited paper appears as high as possible in the
-returned list.
-The task is hard for two reasons: (i)~tweets are short, noisy, and
-multilingual, while abstracts are long, technical, and predominantly
+a low-resource, cross-lingual ad-hoc retrieval problem~\citet{hafid2025}.
+As shown in Figure~\ref{fig:task-definition}, given a social media post (e.g. tweet) that implicitly cites a scientific
+paper, mainly in English, German, or French, containing opinions, comments, hashtags, or tags, the system must rank a fixed corpus of 10{,}000~scientific papers so that the cited paper appears as high as possible in the returned list.
+The task is challenging for two reasons: (i)~tweets are short, noisy, and
+multilingual, while scientific abstracts are long, technical, and predominantly
 written in English; and (ii)~a German or French query may
 correspond to an English target paper, so monolingual retrieval breaks
 the assumption that query and document share a vocabulary.
 
-We approach this problem as an opportunity to systematically apply and
-evaluate core IR techniques — from sparse lexical models to dense
-neural retrieval — against a real-world, competitive benchmark.
-Our experiments investigate the trade-offs between retrieval
-effectiveness and computational efficiency under the constraints imposed
+
+We approach this problem as an opportunity to systematically apply and 
+evaluate core IR techniques — from sparse lexical models to dense 
+neural retrieval — against a real-world competitive benchmark.
+Our experiments investigate the trade-offs between retrieval 
+effectiveness and computational efficiency under the constraints imposed 
 by the competition setting.
 
 \begin{figure}
   \centering
   \includegraphics[width=0.6\linewidth]{figure/01-figure_example-task.png}
-  \caption{An example of the source retrieval task for scientific web claims~\cite{hafid2025disambiguation}.
-           Two tweets which the first one (left) has an explicit reference, while the second one implicitly references a scientific paper (right), the system must
-           retrieve the cited publication (bottom) from a fixed corpus, adapted from \cite{}}
+  \caption{Source Retrieval for Scientific Web Claims problem [Public Domain], 
+  it shows a claim with an implicit reference for which the source publication (box to the right) 
+  needs to be retrieved in task 4b (adapted from \citet{hafid2025})}
   \label{fig:task-definition}
 \end{figure}
 
-The paper is organized as follows: Section~\ref{sec:methodology} describes our approach;
-Section~\ref{sec:setup} explains our experimental setup;
-Section~\ref{sec:results} discusses our main findings;
-finally, Section~\ref{sec:conclusion} draws conclusions and outlines future work.
-\textbf{[To review]}
-% TODO: add to bibliography.bib:
-%   key: hafid2025disambiguation
-%   S. Hafid, Y. S. Kartal, S. Schellhammer, V. Jacot, S. Bringay, S. Dietze, K. Todorov,
-%   "Disambiguation of implicit scientific references on X",
-%   Proceedings of the 36th ACM Conference on Hypertext and Social Media (2025).
-%
-%   key: checkthat2026
-%   CLEF 2026 CheckThat! Lab Task 1 overview paper (add when published).
+The paper is organized as follows: Section~\ref{sec:methodology} describes our approach; 
+Section~\ref{sec:setup} explains our experimental setup; Section~\ref{sec:results} discusses our main findings and problems; 
+finally, Section~\ref{sec:conclusion} draws some conclusions and outlooks for future work.
